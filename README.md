@@ -282,6 +282,30 @@ xdg.configFile."spt/config.toml".source = (pkgs.formats.toml { }).generate "spt.
 };
 ```
 
+## Status bars
+
+`spt` publishes what plays over [MPRIS](https://specifications.freedesktop.org/mpris-spec/latest/)
+on Linux, as `spt`: title, artist, album, cover, position, volume. Status bars,
+widgets and scripts read it there, with no setting in `spt`. For waybar's own
+`mpris` module:
+
+```jsonc
+"mpris": {
+  "player": "spt",
+  "format": "{status_icon} {title} · {artist}",
+  "status-icons": { "playing": "󰐊", "paused": "󰏤" },
+  "title-len": 32,
+  "on-click": "playerctl -p spt play-pause",
+  "on-scroll-up": "playerctl -p spt volume 0.05+",
+  "on-scroll-down": "playerctl -p spt volume 0.05-"
+}
+```
+
+Anywhere else, `playerctl -p spt metadata --format '{{ artist }} - {{ title }}'`
+prints it once, and `--follow` prints it again at each change. Desktop
+notifications are a setting of their own: `[notifications] enabled = false`
+turns them off.
+
 ## How it works
 
 <p align="center">
