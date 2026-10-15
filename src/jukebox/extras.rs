@@ -274,6 +274,13 @@ impl Jukebox {
         let Some(catalog) = self.catalog() else {
             return;
         };
+        // Whether the music leaves this computer, which must then let it go.
+        let leaving = self.devices.with_untracked(|devices| {
+            devices
+                .iter()
+                .flatten()
+                .any(|other| other.active && other.here)
+        });
         self.close_devices();
         if device.active {
             self.inform(format!("{} is already the device in use.", device.name));
@@ -282,12 +289,25 @@ impl Jukebox {
         let (jukebox, id, name) = (self.clone(), device.id.clone(), device.name.clone());
         let started = self.services.spawn(&self.owner, async move {
             match catalog.transfer(id).await {
-                Ok(()) => jukebox.inform(format!("Music moves to {name}.")),
+                Ok(()) => jukebox.music_moved(&name, leaving),
                 Err(error) => jukebox.warn(error.to_string()),
             }
         });
         if let Err(error) = started {
             self.warn(error.to_string());
+        }
+    }
+
+    /// Says where the music went; if it left this computer, lets it go: see
+    /// `let_music_go`.
+    fn music_moved(self: &Rc<Self>, name: &str, leaving: bool) {
+        if leaving {
+            self.let_music_go();
+            self.inform(format!(
+                "Music moves to {name}; this computer joins again when you play here."
+            ));
+        } else {
+            self.inform(format!("Music moves to {name}."));
         }
     }
 

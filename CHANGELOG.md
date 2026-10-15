@@ -21,6 +21,9 @@
 - **Your Episodes** in the sidebar.
 - **Sleep timer** (`Z`): 15, 30, 45, 60 minutes or the end of the track (`[sleep]`).
 - **Playlist edits**: take a track out (`X`), move it (`K`, `J`), rename (`E`).
+- **Fixes.** Space after a stop plays the track again in its list, rather than
+  the selected row. Music moved to another device keeps playing there: this
+  computer lets it go, and joins Spotify again when something plays here.
 - **Fix.** A title too long for its column no longer runs into the next one.
 - Changes to the library go through the session, like the desktop app: the
   public Web API answers this client with "too many requests".

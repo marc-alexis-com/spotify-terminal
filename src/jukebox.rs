@@ -143,6 +143,13 @@ pub(crate) struct Jukebox {
     load_all: Cell<bool>,
     /// The tracks queued here that have not played yet, in order.
     queue: RefCell<Vec<String>>,
+    /// Whether this computer let the music go to another device, and has no
+    /// speaker until something plays here again.
+    dormant: Cell<bool>,
+    /// Whether a key asked for this computer's speaker while it had none.
+    wake_wanted: Cell<bool>,
+    /// Where speakers send their player events, kept to make a new speaker.
+    events: RefCell<Option<spotify::Events>>,
     /// What was played last from this computer, to play again after a stop.
     last_play: RefCell<Option<spotify::Play>>,
     /// The list the playing track was started from, for what comes next.
@@ -230,6 +237,9 @@ impl FromInputs for Jukebox {
             full: RefCell::new(None),
             load_all: Cell::new(false),
             queue: RefCell::new(Vec::new()),
+            dormant: Cell::new(false),
+            wake_wanted: Cell::new(false),
+            events: RefCell::new(None),
             last_play: RefCell::new(None),
             playing_list: RefCell::new(Vec::new()),
             list_position: RefCell::new(None),

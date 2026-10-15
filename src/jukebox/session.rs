@@ -86,6 +86,7 @@ impl Jukebox {
     async fn connect(self: Rc<Self>, token: Token) -> Result<(), spotify::Error> {
         self.screen.set(Screen::Connecting);
         let (events, player_events) = mpsc::unbounded_channel();
+        self.events.replace(Some(events.clone()));
         let connection =
             Speaker::connect(token.access, events.clone(), config::get().initial_volume()).await?;
         let lost = self.install(connection);
@@ -114,6 +115,43 @@ impl Jukebox {
 
     /// librespot drops its session after a sleep or a network change and never
     /// reconnects, so a new speaker and catalog replace the dead ones.
+    /// Lets the music go once it moved to another device. librespot keeps the
+    /// music it played until its speaker stops, and the other device waits,
+    /// stopped, until then; a new speaker of this computer, coming back at
+    /// once, stopped it there again, even under a new device ID. So this
+    /// computer stays without a speaker until something plays here again.
+    pub(super) fn let_music_go(&self) {
+        // Dropped on purpose: its watch ends without reconnecting.
+        drop(self.speaker.replace(None));
+        self.dormant.set(true);
+    }
+
+    /// Makes this computer a Spotify device again, after `let_music_go`.
+    pub(super) fn wake(self: &Rc<Self>) {
+        let Some(events) = self.events.borrow().clone() else {
+            return;
+        };
+        if !self.dormant.replace(false) {
+            return;
+        }
+        let jukebox = self.clone();
+        let started = self.spawn(async move {
+            let lost = jukebox
+                .reconnect(&events, config::get().initial_volume())
+                .await?;
+            jukebox.inform("This computer plays again; press the key once more.");
+            let watch = jukebox.clone().stay_connected(lost, events);
+            if let Err(error) = jukebox.services.spawn(&jukebox.owner, watch) {
+                jukebox.warn(format!("Cannot watch the connection to Spotify: {error}"));
+            }
+            Ok(())
+        });
+        if let Err(error) = started {
+            self.dormant.set(true);
+            self.warn(error.to_string());
+        }
+    }
+
     async fn stay_connected(self: Rc<Self>, mut lost: spotify::Lost, events: spotify::Events) {
         // A speaker dropped on purpose ends the watch without a loss.
         while lost.await.is_ok() {

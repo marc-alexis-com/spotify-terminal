@@ -161,6 +161,9 @@ impl Jukebox {
                 return;
             }
             self.clock.update(|clock| *clock += 1);
+            if self.wake_wanted.replace(false) {
+                self.wake();
+            }
             self.remember_view();
             self.check_sleep();
             let episode = self.now.with_untracked(|now| {
@@ -376,7 +379,14 @@ impl Jukebox {
     ) {
         let result = match self.speaker.borrow().as_ref() {
             Some(speaker) => action(speaker),
-            None => return,
+            None => {
+                // The music went to another device: this computer joins again,
+                // and the key works once it did. See `let_music_go`.
+                if self.dormant.get() && !self.wake_wanted.replace(true) {
+                    self.inform("This computer joins Spotify again…");
+                }
+                return;
+            }
         };
         if let Err(error) = result {
             self.warn(error.to_string());
