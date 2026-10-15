@@ -2,10 +2,11 @@
 
     python3 render.py OUT_DIR FONTS_DIR CAPTURES_DIR
 
-Needs Pillow. FONTS_DIR holds Iosevka (https://github.com/be5invis/Iosevka) as
-iosevka-regular.ttf, iosevka-bold.ttf, iosevka-italic.ttf; a Nerd Font Mono as
-nerd.ttf, for the player's icons; and Doto (https://github.com/oliverlalan/Doto,
-SIL OFL) as doto.ttf, for the title.
+Needs Pillow. FONTS_DIR holds Figtree (https://github.com/erikdkennedy/figtree,
+SIL OFL) as figtree.ttf, for the banner and the diagram; Iosevka
+(https://github.com/be5invis/Iosevka) as iosevka-regular.ttf, iosevka-bold.ttf and
+iosevka-italic.ttf, for the terminal; and a Nerd Font Mono as nerd.ttf, for the
+player's icons.
 
 CAPTURES_DIR holds real terminal output: each NAME.ansi is one screen of `spt`
 captured with `tmux capture-pane -e -p`, 150 columns wide. Album covers reach the
@@ -13,8 +14,9 @@ terminal as kitty Unicode placeholders, which a capture keeps as text; NAME.cove
 lists, one per line, `RRGGBB IMAGE` for the placeholders of that color (the color
 is the image's ID: see src/cover.rs), and the image is drawn in their place.
 
-Style: monochrome ink on paper (or paper on ink), hairline rules, uppercase mono
-labels, dot-matrix only for display, and Spotify's green as the one accent.
+Style: the player's own. Dark surfaces, Spotify's green as the one accent, a
+gradient header as a playlist page has, rounded cards, a bold geometric sans.
+No Spotify logo: it is a trademark.
 """
 import math
 import re
@@ -22,15 +24,14 @@ import sys
 import unicodedata
 from pathlib import Path
 
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 OUT, FONTS, CAPTURES = (Path(arg) for arg in sys.argv[1:4])
 K = 2  # supersampling: every logical pixel is K device pixels
 
-THEMES = {
-    "light": dict(bg="#ffffff", ink="#000000", muted="#585a5a", hair="#e5e7eb", off="#e9eaec", accent="#1aa34a"),
-    "dark": dict(bg="#000000", ink="#ffffff", muted="#9a9c9c", hair="#2a2a2a", off="#1c1c1c", accent="#1ed760"),
-}
+BASE, CARD, RAISED = "#121212", "#181818", "#282828"
+TEXT, SUBTEXT, MUTED = "#ffffff", "#b3b3b3", "#6a6a6a"
+GREEN, GREEN_DEEP = "#1ed760", "#1db954"
 
 
 def font(name, size):
@@ -41,166 +42,148 @@ def mono(size, bold=False):
     return font("iosevka-bold.ttf" if bold else "iosevka-regular.ttf", size)
 
 
-def doto(size, weight=700, round_=100):
-    face = font("doto.ttf", size)
+def sans(size, weight=400):
+    face = font("figtree.ttf", size)
     try:
-        values = []
-        for axis in face.get_variation_axes():
-            name = axis["name"].decode() if isinstance(axis["name"], bytes) else axis["name"]
-            values.append(weight if "eight" in name else round_)
-        face.set_variation_by_axes(values)
+        face.set_variation_by_axes([weight])
     except OSError:
         pass
     return face
 
 
-def spaced(draw, xy, text, face, fill, tracking=0.0):
-    """Draws text with extra letter spacing (in logical px)."""
-    x, y = xy
-    for ch in text:
-        draw.text((x, y), ch, font=face, fill=fill)
-        x += draw.textlength(ch, font=face) + tracking * K
-    return x
+def rgb(color):
+    return tuple(int(color[i:i + 2], 16) for i in (1, 3, 5))
 
 
-def text_width(draw, text, face, tracking=0.0):
-    return sum(draw.textlength(c, font=face) for c in text) + tracking * K * max(len(text) - 1, 0)
+def mix(a, b, t):
+    return tuple(round(x + (y - x) * t) for x, y in zip(rgb(a), rgb(b)))
 
 
-# --- Dot-matrix equalizer, the player's logo ---------------------------------------------
-BARS = [9, 15, 22, 15, 9]  # LEDs lit in each bar, as assets/logo.txt draws it
-
-
-def equalizer(img, x0, y0, cols, rows, pitch, theme):
-    """Five bars of LEDs rising from the bottom; the top LED of each is the accent."""
-    t = THEMES[theme]
+def gradient(img, top, bottom, height):
+    """A vertical fade from `top` to `bottom` over the first `height` logical pixels."""
     d = ImageDraw.Draw(img)
-    width, gap = 4, 3
-    left = (cols - (len(BARS) * width + (len(BARS) - 1) * gap)) // 2
-    lit, tops = set(), set()
-    for bar, height in enumerate(BARS):
-        start = left + bar * (width + gap)
-        for i in range(start, start + width):
-            for j in range(rows - height, rows):
-                lit.add((i, j))
-            tops.add((i, rows - height))
-    for j in range(rows):
-        for i in range(cols):
-            cx = (x0 + i * pitch + pitch / 2) * K
-            cy = (y0 + j * pitch + pitch / 2) * K
-            if (i, j) in tops:
-                r, color = pitch * 0.36 * K, t["accent"]
-            elif (i, j) in lit:
-                r, color = pitch * 0.36 * K, t["ink"]
-            else:
-                r, color = pitch * 0.11 * K, t["off"]
-            d.ellipse([cx - r, cy - r, cx + r, cy + r], fill=color)
+    for y in range(height * K):
+        d.line([(0, y), (img.width, y)], fill=mix(top, bottom, y / (height * K)))
 
 
-def hero(theme):
-    t = THEMES[theme]
-    W, H = 960, 400
-    img = Image.new("RGB", (W * K, H * K), t["bg"])
+def shadow(img, box, radius, blur=18, offset=8, strength=150):
+    """A soft drop shadow under a rounded box, as Spotify's cards have."""
+    x0, y0, x1, y1 = (v * K for v in box)
+    layer = Image.new("L", img.size, 0)
+    ImageDraw.Draw(layer).rounded_rectangle([x0, y0 + offset * K, x1, y1 + offset * K], radius=radius * K, fill=strength)
+    layer = layer.filter(ImageFilter.GaussianBlur(blur * K))
+    img.paste(Image.new("RGB", img.size, "#000000"), (0, 0), layer)
+
+
+def play_button(d, cx, cy, r):
+    d.ellipse([(cx - r) * K, (cy - r) * K, (cx + r) * K, (cy + r) * K], fill=GREEN)
+    s = r * 0.42
+    d.polygon([((cx - s * 0.75) * K, (cy - s) * K), ((cx - s * 0.75) * K, (cy + s) * K), ((cx + s * 1.05) * K, cy * K)], fill="#000000")
+
+
+# --- The cover of the banner: a terminal prompt over an equalizer ----------------------------
+def cover_art(size):
+    img = Image.new("RGB", (size * K, size * K), "#0d0d0d")
+    gradient(img, "#1f6f43", "#0b0b0b", size)
     d = ImageDraw.Draw(img)
-    d.rectangle([0, 0, W * K - 1, H * K - 1], outline=t["hair"], width=K)
-    equalizer(img, 40, 40, 38, 32, 10, theme)
+    # five bars, as assets/logo.txt draws the player's logo
+    heights, w, gap = [0.30, 0.48, 0.66, 0.48, 0.30], size * 0.09, size * 0.045
+    left = (size - (5 * w + 4 * gap)) / 2
+    floor = size * 0.80
+    for i, h in enumerate(heights):
+        x = left + i * (w + gap)
+        d.rounded_rectangle([x * K, (floor - h * size) * K, (x + w) * K, floor * K], radius=w * 0.35 * K, fill=GREEN)
+    d.text((size * 0.09 * K, size * 0.07 * K), ">_", font=mono(int(size * 0.17), bold=True), fill=TEXT)
+    mask = Image.new("L", img.size, 0)
+    ImageDraw.Draw(mask).rounded_rectangle([0, 0, img.width - 1, img.height - 1], radius=10 * K, fill=255)
+    return img, mask
 
-    x = 470
-    cap = mono(11)
-    chip = "UNOFFICIAL  ·  TERMINAL CLIENT"
-    cwid = text_width(d, chip, cap, 0.6) / K
-    d.rectangle([x * K, 58 * K, (x + cwid + 20) * K, 82 * K], outline=t["hair"], width=K)
-    spaced(d, ((x + 10) * K, 63 * K), chip, cap, t["muted"], 0.6)
 
+def hero():
+    W, H = 960, 420
+    img = Image.new("RGB", (W * K, H * K), BASE)
+    gradient(img, "#1a6b40", BASE, 330)
+    d = ImageDraw.Draw(img)
+
+    art = 232
+    x0, y0 = 48, 52
+    shadow(img, (x0, y0, x0 + art, y0 + art), 10, blur=22, offset=12, strength=170)
+    cover, mask = cover_art(art)
+    img.paste(cover, (x0 * K, y0 * K), mask)
+    d = ImageDraw.Draw(img)
+
+    x = x0 + art + 36
+    d.text((x * K, 118 * K), "Terminal client", font=sans(15, 700), fill=TEXT)
     title = "spotify-terminal"
-    size = 54
-    while size > 20 and text_width(d, title, doto(size), 1.0) / K > W - 40 - x:
+    size = 78
+    while size > 30 and d.textlength(title, font=sans(size, 800)) / K > W - 40 - x:
         size -= 1
-    spaced(d, (x * K, 110 * K), title, doto(size), t["ink"], 1.0)
+    d.text(((x - 3) * K, 134 * K), title, font=sans(size, 800), fill=TEXT)
+    d.text((x * K, (148 + size) * K), "Your library, search and artists, played from a terminal.", font=sans(17, 500), fill=SUBTEXT)
+    meta = ["Rust + HTML", "librespot", "320 kbit/s", "covers in kitty", "Premium"]
+    mx = x
+    for i, item in enumerate(meta):
+        face = sans(14, 700 if i == 0 else 500)
+        d.text((mx * K, (184 + size) * K), item, font=face, fill=TEXT if i == 0 else SUBTEXT)
+        mx += d.textlength(item, font=face) / K
+        if i < len(meta) - 1:
+            d.text(((mx + 6) * K, (184 + size) * K), "•", font=face, fill=SUBTEXT)
+            mx += 22
 
-    body = mono(17)
-    d.text((x * K, 190 * K), "Your library, search and artists,", font=body, fill=t["ink"])
-    d.text((x * K, 214 * K), "played from a terminal.", font=body, fill=t["ink"])
+    # the action row of a playlist page
+    play_button(d, x0 + 28, 330, 28)
+    for i, glyph in enumerate(["\U000f049d", "\U000f0456", "\U000f01d8"]):  # shuffle, repeat, more
+        d.text(((x0 + 82 + i * 44) * K, 316 * K), glyph, font=font("nerd.ttf", 26), fill=SUBTEXT)
 
-    specs = [("AUDIO", "LIBRESPOT · 320 KBIT/S"), ("INTERFACE", "HTML + CSS, COMPILED"), ("NEEDS", "SPOTIFY PREMIUM")]
-    y = 270
-    lab, val = mono(11), mono(13)
-    for key, value in specs:
-        d.line([(x * K, y * K), ((W - 40) * K, y * K)], fill=t["hair"], width=K)
-        spaced(d, (x * K, (y + 10) * K), key, lab, t["muted"], 0.6)
-        d.text(((x + 140) * K, (y + 8) * K), value, font=val, fill=t["ink"])
-        y += 34
-    d.line([(x * K, y * K), ((W - 40) * K, y * K)], fill=t["hair"], width=K)
-    img.save(OUT / f"hero-{theme}.png", optimize=True)
-
-
-# --- How it works ---------------------------------------------------------------------------
-def dotted(d, x0, y0, x1, y1, color, pitch=7, r=1.6):
-    n = max(1, int(math.hypot(x1 - x0, y1 - y0) / pitch))
-    for i in range(n + 1):
-        x = (x0 + (x1 - x0) * i / n) * K
-        y = (y0 + (y1 - y0) * i / n) * K
-        d.ellipse([x - r * K, y - r * K, x + r * K, y + r * K], fill=color)
-
-
-def card(d, x, y, w, h, t, strong=False):
-    d.rounded_rectangle([x * K, y * K, (x + w) * K, (y + h) * K], radius=8 * K, fill=t["bg"],
-                        outline=t["ink"] if strong else t["hair"], width=K)
+    # a player bar along the bottom
+    by = 386
+    d.text((x0 * K, (by - 9) * K), "1:42", font=sans(12, 500), fill=SUBTEXT)
+    left, right, at = x0 + 44, W - 92, 0.38
+    d.rounded_rectangle([left * K, (by - 2) * K, right * K, (by + 2) * K], radius=2 * K, fill="#4d4d4d")
+    mid = left + (right - left) * at
+    d.rounded_rectangle([left * K, (by - 2) * K, mid * K, (by + 2) * K], radius=2 * K, fill=GREEN)
+    d.ellipse([(mid - 6) * K, (by - 6) * K, (mid + 6) * K, (by + 6) * K], fill=TEXT)
+    d.text(((right + 14) * K, (by - 9) * K), "4:28", font=sans(12, 500), fill=SUBTEXT)
+    img.save(OUT / "hero.png", optimize=True)
 
 
-def architecture(theme):
-    t = THEMES[theme]
-    W, H = 960, 400
-    img = Image.new("RGB", (W * K, H * K), t["bg"])
+# --- How it works, as three cards of a shelf ---------------------------------------------------
+def architecture():
+    W, H = 960, 450
+    img = Image.new("RGB", (W * K, H * K), BASE)
     d = ImageDraw.Draw(img)
-    d.rectangle([0, 0, W * K - 1, H * K - 1], outline=t["hair"], width=K)
-    lab, code = mono(11), mono(14)
+    d.text((40 * K, 30 * K), "How it works", font=sans(26, 800), fill=TEXT)
+    d.text((40 * K, 66 * K), "One process between your terminal and Spotify.", font=sans(15, 500), fill=SUBTEXT)
 
-    def label(x, y, s, color=None):
-        spaced(d, (x * K, y * K), s, lab, color or t["muted"], 0.6)
+    cards = [
+        ("Your terminal", "you see and press", [("ui/*.html + CSS", "compiled at build time"), ("keys and mouse", "every key remappable"), ("kitty images", "album covers, in tmux too")]),
+        ("spt", "one process", [("hypercmd views", "bound to the Rust state"), ("librespot speaker", "plays the audio itself"), ("config.toml", "theme, keys, playback")]),
+        ("Spotify", "your Premium account", [("accounts", "OAuth with PKCE, once"), ("catalog and library", "through the session"), ("audio streams", "320 kbit/s, cached")]),
+    ]
+    cw, ch, top, gap = 272, 262, 104, 32
+    for i, (title, sub, rows) in enumerate(cards):
+        x = 40 + i * (cw + gap)
+        fill = RAISED if i == 1 else CARD
+        d.rounded_rectangle([x * K, top * K, (x + cw) * K, (top + ch) * K], radius=8 * K, fill=fill)
+        d.text(((x + 20) * K, (top + 18) * K), title, font=sans(19, 800), fill=TEXT)
+        d.text(((x + 20) * K, (top + 44) * K), sub, font=sans(13, 500), fill=SUBTEXT)
+        for j, (name, note) in enumerate(rows):
+            y = top + 86 + j * 56
+            d.ellipse([(x + 20) * K, (y + 6) * K, (x + 28) * K, (y + 14) * K], fill=GREEN)
+            d.text(((x + 38) * K, y * K), name, font=mono(14, bold=True), fill=TEXT)
+            d.text(((x + 38) * K, (y + 22) * K), note, font=sans(13, 500), fill=SUBTEXT)
+        if i < 2:
+            ax = x + cw + 4
+            d.line([(ax * K, (top + ch / 2) * K), ((ax + gap - 10) * K, (top + ch / 2) * K)], fill=GREEN, width=2 * K)
+            mid_y = top + ch / 2
+            for tip, back in ((ax + gap - 8, -7), (ax, 7)):  # both ways
+                d.polygon([(tip * K, mid_y * K), ((tip + back) * K, (mid_y - 5) * K), ((tip + back) * K, (mid_y + 5) * K)], fill=GREEN)
 
-    for x, n, s in [(40, "01", "YOUR TERMINAL"), (360, "02", "ONE PROCESS: spt"), (690, "03", "SPOTIFY")]:
-        label(x, 36, n, t["ink"])
-        label(x + 30, 36, s)
-
-    # 01 the terminal: what the user sees and presses
-    rows = [("ui/*.html + CSS", "COMPILED AT BUILD TIME"), ("keys, mouse", "REMAPPABLE IN [keys]"), ("kitty images", "ALBUM COVERS, ALSO IN TMUX")]
-    for i, (c, s) in enumerate(rows):
-        y = 66 + i * 76
-        card(d, 40, y, 250, 60, t)
-        d.text((56 * K, (y + 12) * K), c, font=code, fill=t["ink"])
-        label(56, y + 36, s)
-
-    # 02 the process
-    card(d, 360, 66, 260, 212, t, strong=True)
-    for i, line in enumerate(["hypercmd views", "Rust state", "librespot speaker", "MPRIS on D-Bus"]):
-        d.text((378 * K, (84 + i * 26) * K), line, font=code, fill=t["ink"])
-    d.line([(378 * K, 196 * K), (602 * K, 196 * K)], fill=t["hair"], width=K)
-    label(378, 208, "READS ~/.config/spt/config.toml")
-    label(378, 226, "REMEMBERS THE LAST VIEW")
-    label(378, 244, "PLAYS THE AUDIO ITSELF")
-
-    # 03 Spotify
-    card(d, 690, 66, 230, 212, t)
-    for i, line in enumerate(["accounts login", "catalog, library", "audio streams"]):
-        d.text((706 * K, (84 + i * 26) * K), line, font=code, fill=t["ink"])
-    d.line([(706 * K, 170 * K), (902 * K, 170 * K)], fill=t["hair"], width=K)
-    label(706, 182, "OAUTH WITH PKCE, IN")
-    label(706, 200, "YOUR BROWSER, ONCE")
-    rx, ry = 706, 236
-    d.ellipse([rx * K, (ry + 1) * K, (rx + 8) * K, (ry + 9) * K], fill=t["accent"])
-    label(rx + 16, ry, "A CONNECT DEVICE")
-    label(rx + 16, ry + 18, "OTHER APPS CAN DRIVE")
-
-    for i in range(3):
-        y = 96 + i * 76
-        dotted(d, 296, y, 352, 172 if i == 1 else (120 if i == 0 else 224), t["ink"])
-    dotted(d, 626, 172, 684, 172, t["ink"], pitch=6, r=2.2)
-
-    y = 330
-    dotted(d, 490, 284, 490, y, t["muted"], pitch=8, r=1.3)
-    label(40, 350, "playerctl, MEDIA KEYS, STATUS BARS  →  MPRIS   ·   YOUR PHONE  →  SPOTIFY CONNECT")
-    img.save(OUT / f"architecture-{theme}.png", optimize=True)
+    y = top + ch + 26
+    d.rounded_rectangle([40 * K, y * K, (W - 40) * K, (y + 34) * K], radius=17 * K, fill=CARD)
+    play_button(d, 58, y + 17, 11)
+    d.text((80 * K, (y + 8) * K), "Media keys, playerctl and status bars drive it over MPRIS; your phone drives it over Spotify Connect.", font=sans(14, 500), fill=SUBTEXT)
+    img.save(OUT / "architecture.png", optimize=True)
 
 
 # --- Terminal screenshots ---------------------------------------------------------------------
@@ -342,12 +325,14 @@ def terminal(name, default_fg, default_bg):
         x0, y0 = min(c[0] for c in cells), min(c[1] for c in cells)
         x1, y1 = max(c[0] for c in cells) + cw * K, max(c[1] for c in cells) + lh * K
         img.paste(cover_image(covers[color], x1 - x0, y1 - y0), (int(x0), int(y0)))
+    mask = Image.new("L", img.size, 0)
+    ImageDraw.Draw(mask).rounded_rectangle([0, 0, img.width - 1, img.height - 1], radius=12 * K, fill=255)
+    img.putalpha(mask)
     img.save(OUT / f"{name}.png", optimize=True)
 
 
-for th in THEMES:
-    hero(th)
-    architecture(th)
+hero()
+architecture()
 SPOTIFY = ("#ffffff", "#121212")
 for capture in sorted(CAPTURES.glob("*.ansi")):
     colors = ("#cdd6f4", "#1e1e2e") if capture.stem.startswith("theme") else SPOTIFY

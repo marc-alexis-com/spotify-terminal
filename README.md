@@ -1,15 +1,12 @@
 <p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/images/hero-dark.png">
-    <img src="docs/images/hero-light.png" alt="spotify-terminal: play Spotify from a terminal" width="100%">
-  </picture>
+  <img src="docs/images/hero.png" alt="spotify-terminal: play Spotify from a terminal" width="100%">
 </p>
 
 <p align="center">
   <a href="https://github.com/marc-alexis-com/spotify-terminal/actions/workflows/check.yml"><img src="https://github.com/marc-alexis-com/spotify-terminal/actions/workflows/check.yml/badge.svg" alt="Check"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-000000?style=flat-square" alt="MIT license"></a>
-  <img src="https://img.shields.io/badge/platform-Linux%20%C2%B7%20macOS-000000?style=flat-square" alt="Linux and macOS">
-  <img src="https://img.shields.io/badge/needs-Spotify%20Premium-000000?style=flat-square" alt="Needs Spotify Premium">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-1db954?style=flat-square" alt="MIT license"></a>
+  <img src="https://img.shields.io/badge/platform-Linux%20%C2%B7%20macOS-121212?style=flat-square" alt="Linux and macOS">
+  <img src="https://img.shields.io/badge/needs-Spotify%20Premium-1db954?style=flat-square" alt="Needs Spotify Premium">
 </p>
 
 **`spt`** plays Spotify in your terminal. Browse your Liked Songs, playlists and
@@ -228,10 +225,7 @@ xdg.configFile."spt/config.toml".source = (pkgs.formats.toml { }).generate "spt.
 ## How it works
 
 <p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/images/architecture-dark.png">
-    <img src="docs/images/architecture-light.png" alt="the terminal, one spt process, and Spotify" width="100%">
-  </picture>
+  <img src="docs/images/architecture.png" alt="the terminal, one spt process, and Spotify" width="100%">
 </p>
 
 - **Browser login.** Spotify's OAuth authorization-code flow with PKCE and a
