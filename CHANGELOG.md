@@ -3,7 +3,8 @@
 ## Unreleased
 
 - **Likes.** A heart before every liked track, in the lists and the player;
-  `H` likes the row or takes the like back, `*` does it for what plays.
+  `H` likes the row or takes the like back, `*` does it for what plays. A like
+  taken back keeps its date: liking the track again puts it back in its place.
 - **Playlists.** `t` adds the row to a playlist, chosen in a picker that filters
   as you type; a new name creates the playlist.
 - **Queue.** `u` and the sidebar's Up next show the queued tracks, then the rest
