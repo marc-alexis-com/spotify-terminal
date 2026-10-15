@@ -16,6 +16,15 @@ const PLAYED_MARGIN: Duration = Duration::from_secs(60);
 /// How far an episode moves before its position is saved again.
 const SAVE_EVERY: Duration = Duration::from_secs(10);
 
+/// What a like did, once Spotify took it.
+#[derive(Clone, Copy)]
+enum LikeChange {
+    Given(u32),
+    /// Given again with the date it had before it was taken back.
+    GivenAgain(u32),
+    TakenBack,
+}
+
 /// The tracks the playlist picker adds, and how it names them.
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct Picker {
@@ -83,16 +92,25 @@ impl Jukebox {
             self.save_unliked();
         }
         let first_date = self.unliked.borrow().get(&uri).copied().filter(|_| like);
+        // Set once, so that the date sent and the date kept are the same.
+        let date = first_date.unwrap_or_else(now);
         self.saved.update(|saved| flip(saved, like, &uri));
         let jukebox = self.clone();
         let started = self.services.spawn(&self.owner, async move {
             let done = if like {
-                catalog.save(uri.clone(), first_date).await
+                catalog.save(uri.clone(), Some(date)).await
             } else {
                 catalog.unsave(uri.clone()).await
             };
             match done {
-                Ok(()) => jukebox.liked_changed(&uri, &name, like, first_date),
+                Ok(()) => {
+                    let change = match first_date {
+                        _ if !like => LikeChange::TakenBack,
+                        Some(date) => LikeChange::GivenAgain(date),
+                        None => LikeChange::Given(date),
+                    };
+                    jukebox.liked_changed(&uri, &name, change);
+                }
                 Err(error) => {
                     jukebox.saved.update(|saved| flip(saved, !like, &uri));
                     jukebox.warn(error.to_string());
@@ -105,30 +123,27 @@ impl Jukebox {
     }
 
     /// Notes a like given or taken back, and says so.
-    fn liked_changed(&self, uri: &str, name: &str, like: bool, first_date: Option<u32>) {
-        if !like {
-            self.liked_at.borrow_mut().remove(uri);
-            self.inform(format!(
-                "Took back the like of “{name}”; liking it again puts it back in its place."
-            ));
-            return;
-        }
-        let date = first_date.unwrap_or_else(|| {
-            let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH);
-            now.map_or(0, |since| {
-                u32::try_from(since.as_secs()).unwrap_or(u32::MAX)
-            })
-        });
-        self.liked_at.borrow_mut().insert(uri.to_owned(), date);
-        if first_date.is_some() {
-            self.unliked.borrow_mut().remove(uri);
-            self.save_unliked();
-            self.inform(format!(
-                "Liked “{name}” again, back in its place of {}.",
-                day(date)
-            ));
-        } else {
-            self.inform(format!("Liked “{name}”."));
+    fn liked_changed(&self, uri: &str, name: &str, change: LikeChange) {
+        match change {
+            LikeChange::TakenBack => {
+                self.liked_at.borrow_mut().remove(uri);
+                self.inform(format!(
+                    "Took back the like of “{name}”; liking it again puts it back in its place."
+                ));
+            }
+            LikeChange::Given(date) => {
+                self.liked_at.borrow_mut().insert(uri.to_owned(), date);
+                self.inform(format!("Liked “{name}”."));
+            }
+            LikeChange::GivenAgain(date) => {
+                self.liked_at.borrow_mut().insert(uri.to_owned(), date);
+                self.unliked.borrow_mut().remove(uri);
+                self.save_unliked();
+                self.inform(format!(
+                    "Liked “{name}” again, back in its place of {}.",
+                    day(date)
+                ));
+            }
         }
     }
 
@@ -423,6 +438,15 @@ fn mark(point: &Resume) -> Option<&'static str> {
     } else {
         None
     }
+}
+
+/// Now, in seconds since 1970.
+fn now() -> u32 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |since| {
+            u32::try_from(since.as_secs()).unwrap_or(u32::MAX)
+        })
 }
 
 /// The day of a date in seconds since 1970, as `2022-06-09`.
