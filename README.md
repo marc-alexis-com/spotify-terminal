@@ -37,17 +37,17 @@ all come from one settings file.
 ## A look at it
 
 <p align="center">
-  <img src="docs/images/artist.png" alt="spt on Daft Punk's artist page: picture, numbers, popular tracks, discography" width="100%">
+  <img src="docs/images/playing-artist.png" alt="spt on Daft Punk's artist page: picture, numbers, popular tracks, discography" width="100%">
 </p>
 
 <p align="center">
-  <img src="docs/images/search.png" alt="a catalog search: songs, then boxes of artists, albums, playlists and podcasts" width="49%">
-  <img src="docs/images/theme.png" alt="the same artist page with a Catppuccin theme, square corners and the player on top" width="49%">
+  <img src="docs/images/playing-search.png" alt="a catalog search: songs, then boxes of artists, albums, playlists and podcasts" width="49%">
+  <img src="docs/images/playing-theme.png" alt="the same artist page with a Catppuccin theme, square corners and the player on top" width="49%">
   <br><sub>A search as you type, and the artist page again with a Catppuccin Mocha theme, square corners and the player on top.</sub>
 </p>
 
 <p align="center">
-  <img src="docs/images/help.png" alt="the keys, as ? shows them" width="85%">
+  <img src="docs/images/playing-help.png" alt="the keys, as ? shows them" width="85%">
   <br><sub><code>?</code> lists the keys, as the settings set them.</sub>
 </p>
 
