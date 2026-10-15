@@ -1,183 +1,129 @@
-# Play Spotify. Stay in your terminal.
-
-spotify-tui is a Spotify player for macOS and Linux. Browse your Liked Songs,
-playlists and recent plays, search the catalog, and jump to a track's album or
-artist. Music plays directly on your computer. The installed executable is
-named `spt`; the Cargo package is `fusor-spotify-tui`.
-
-The terminal interface is written in HTML and CSS with
-[Hypercmd](https://github.com/fusor-rs/hypercmd) and
-[Fusor](https://github.com/fusor-rs/fusor). Login, browsing and audio use
-[librespot](https://github.com/librespot-org/librespot).
-
-**In development · v0.1.1** — See [status and known limitations](#status-and-known-limitations).
-
 <p align="center">
-  <img src="assets/screenshot.svg" alt="spotify-tui playing a search result, with the library sidebar, track list and now-playing bar" width="900">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/hero-dark.png">
+    <img src="docs/images/hero-light.png" alt="spotify-terminal: play Spotify from a terminal" width="100%">
+  </picture>
 </p>
 
-[Get started](#get-started) · [Using spotify-tui](#using-spotify-tui) ·
-[How it works](#how-it-works) · [Status](#status-and-known-limitations) ·
-[Contributing](#contributing)
+<p align="center">
+  <a href="https://github.com/marc-alexis-com/spotify-terminal/actions/workflows/check.yml"><img src="https://github.com/marc-alexis-com/spotify-terminal/actions/workflows/check.yml/badge.svg" alt="Check"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-000000?style=flat-square" alt="MIT license"></a>
+  <img src="https://img.shields.io/badge/platform-Linux%20%C2%B7%20macOS-000000?style=flat-square" alt="Linux and macOS">
+  <img src="https://img.shields.io/badge/needs-Spotify%20Premium-000000?style=flat-square" alt="Needs Spotify Premium">
+</p>
+
+**`spt`** plays Spotify in your terminal. Browse your Liked Songs, playlists and
+recent plays, search the catalog, open an artist's page or an album, and listen:
+the audio plays on your computer, in 320 kbit/s, with no Spotify app running.
+Album covers show in kitty, even inside tmux. Colors, layout, keys and playback
+all come from one settings file.
+
+> [!IMPORTANT]
+> An **unofficial** client, not affiliated with or endorsed by Spotify. Playback
+> needs a **Spotify Premium** account. Spotify's internal services are
+> undocumented and can change without notice.
+
+## Features
+
+| Area | What you get |
+|---|---|
+| **Library** | Liked Songs, playlists in their folders, recently played, and a search of your own library |
+| **Catalog** | search as you type, with songs, artists, albums, playlists and podcasts |
+| **Artists** | picture, monthly listeners, popular tracks with their play counts, discography, related artists |
+| **Playback** | 320 kbit/s, normalised loudness, gapless, seek (30 s in podcasts), volume, shuffle, repeat, queue |
+| **Covers** | album and artist pictures in kitty, through tmux too, with Unicode placeholders |
+| **Spotify Connect** | other Spotify apps see this computer and can drive it |
+| **Media keys** | MPRIS on Linux: `playerctl`, media keys, status bars |
+| **Memory** | reopens the view and the row you left |
+| **Settings** | theme, corners, player on top or below, sidebar, columns, every key, audio output, cache… |
+
+## A look at it
+
+<p align="center">
+  <img src="docs/images/artist.png" alt="spt on Daft Punk's artist page: picture, numbers, popular tracks, discography" width="100%">
+</p>
+
+<p align="center">
+  <img src="docs/images/search.png" alt="a catalog search: songs, then boxes of artists, albums, playlists and podcasts" width="49%">
+  <img src="docs/images/theme.png" alt="the same artist page with a Catppuccin theme, square corners and the player on top" width="49%">
+  <br><sub>A search as you type, and the artist page again with a Catppuccin Mocha theme, square corners and the player on top.</sub>
+</p>
+
+<p align="center">
+  <img src="docs/images/help.png" alt="the keys, as ? shows them" width="85%">
+  <br><sub><code>?</code> lists the keys, as the settings set them.</sub>
+</p>
+
+## Install
+
+**Nix** (flake):
+
+```sh
+nix run github:marc-alexis-com/spotify-terminal
+nix profile install github:marc-alexis-com/spotify-terminal
+```
+
+**Prebuilt binary** (x86-64 or ARM64, Linux or macOS), checked against its SHA-256
+before it is installed in `~/.spotify-terminal/bin`:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/marc-alexis-com/spotify-terminal/main/install.sh | sh
+export PATH="$HOME/.spotify-terminal/bin:$PATH"
+```
+
+Linux binaries need glibc 2.35 or newer, ALSA and OpenSSL 3, as Ubuntu 22.04 has.
+`SPOTIFY_TERMINAL_VERSION` picks a release and `SPOTIFY_TERMINAL_INSTALL` another
+folder.
+
+**From source**, with a stable Rust toolchain; on Debian or Ubuntu, first
+`sudo apt-get install build-essential pkg-config libasound2-dev libssl-dev`:
+
+```sh
+cargo install --git https://github.com/marc-alexis-com/spotify-terminal --locked
+```
+
+On Linux, the login is kept by a Secret Service provider such as GNOME Keyring,
+and `xdg-utils` opens the login page.
 
 ## Get started
 
-You need a Spotify Premium account, a terminal on macOS or Linux, and a browser
-for the first login. No Spotify developer app or client ID setup is required.
-
-On Linux, audio uses ALSA and login storage requires an unlocked Secret Service
-provider, such as GNOME Keyring, on your session D-Bus. Install `xdg-utils` to
-let the app open the login page in your browser.
-
-### Install a binary release
-
-The shell installer downloads the latest published GitHub release for x86-64 or
-ARM64 on macOS or Linux. It verifies the SHA-256 checksum and executable version,
-then installs `spt` in `~/.spotify-tui/bin` without sudo or a Rust toolchain:
-
-```sh
-curl -fsSL https://raw.githubusercontent.com/fusor-rs/spotify-tui/main/install.sh | sh
-export PATH="$HOME/.spotify-tui/bin:$PATH"
-spt
-```
-
-Add the `export` line to your shell profile, such as `~/.zshrc` or `~/.bashrc`.
-Run the installer again to upgrade. To choose a release, append `-s -- v0.1.1`
-to `sh`, or set `SPOTIFY_TUI_VERSION` on the `sh` command. Set
-`SPOTIFY_TUI_INSTALL` on that command to choose another install directory; the
-executable goes in its `bin/`.
-
-Linux binaries target glibc 2.35 or newer and need the ALSA and OpenSSL 3 runtime
-libraries, as provided by Ubuntu 22.04 or newer. Alpine's musl runtime is not
-supported by these archives. The installer requires `curl`, `tar`, and either
-`sha256sum` or `shasum`.
-
-This method requires a [GitHub release](https://github.com/fusor-rs/spotify-tui/releases)
-with completed binary uploads.
-
-### Install with Cargo
-
-Install the current stable Rust toolchain through [rustup](https://rustup.rs).
-On Linux, install the build dependencies first; on Debian or Ubuntu:
-
-```sh
-sudo apt-get update
-sudo apt-get install build-essential pkg-config libasound2-dev libssl-dev
-```
-
-On macOS, building requires the Xcode Command Line Tools (`xcode-select --install`).
-After the first release is published to crates.io, install with:
-
-```sh
-cargo install fusor-spotify-tui --locked
-spt
-```
-
-`--locked` uses the release's recorded dependency versions. Cargo installs `spt`
-in `~/.cargo/bin` by default; that directory needs to be in your PATH. Run the
-same command again to upgrade. Check your installed version with `spt --version`.
-
-### Log in and listen
-
 1. Run `spt` and choose **Log in with Spotify**.
-2. Approve access in the browser. The terminal continues automatically after
-   the browser returns to `http://127.0.0.1:8898/login`.
-3. Choose a library section or playlist, select a track, and press Enter.
+2. Approve access in your browser. The terminal goes on by itself once the
+   browser comes back to `http://127.0.0.1:8898/login`.
+3. Choose a playlist, select a track and press Enter.
 
-Your login is stored in macOS Keychain or Linux Secret Service, so later starts
-open your library. Run `spt logout` to remove the saved login. Upgrading the
-executable preserves it; macOS can ask you to allow the updated executable to
-read its keychain item.
+The login stays in the macOS Keychain or the Linux Secret Service, so the next
+starts open your library directly; `spt logout` removes it. No Spotify developer
+app or client ID is needed.
 
-### Build from source
-
-With Rust and the platform build dependencies installed:
-
-```sh
-git clone https://github.com/fusor-rs/spotify-tui.git
-cd spotify-tui
-cargo install --path . --locked
-spt
-```
-
-For development, `cargo run --locked` builds and launches the app from the checkout.
-
-## Using spotify-tui
-
-### Browse your library
-
-The sidebar lists your library and playlists. Choose a section to see its tracks,
-then use the arrow keys and Enter to start playback. Press `/` or Ctrl+F to search
-the catalog: the songs found fill the list, and boxes below it show the artists,
-albums, playlists and podcasts found. Tab moves from the list to those boxes,
-where `h`, `j`, `k` and `l` move between results and Enter opens one. With a track selected, press `o` to open its album or `a` to open
-its artist; Escape goes back.
-
-### Control playback
-
-The player bar, at the bottom or the top (see [Settings](#settings)), shows what's playing. Use its buttons or the keyboard to
-pause, skip, seek, change volume, shuffle, or cycle repeat modes. Press `z` to
-add the selected track to the queue; queued tracks play after the current one.
-While `spt` runs, other Spotify apps list this computer as **Spotify**, so
-you can also control its playback from your phone.
-
-On Linux, `spt` registers as an [MPRIS](https://specifications.freedesktop.org/mpris-spec/latest/)
-media player on the session D-Bus, so media keys, desktop widgets, status bars
-and `playerctl` control it without switching to the terminal:
-
-```sh
-playerctl -p spt play-pause
-playerctl -p spt next
-playerctl -p spt metadata --format '{{ artist }} - {{ title }}'
-```
-
-A second running `spt` registers as `spt.instance<PID>`.
-
-In [kitty](https://sw.kovidgoyal.net/kitty/), the album cover shows left of the
-player bar. It uses the kitty graphics protocol with Unicode placeholders, so it
-also works inside tmux once `set -g allow-passthrough on` is set. Other terminals
-show the bar without it.
-
-### Keyboard and mouse
-
-Press `?` in the player to see the controls. Click the sidebar and playback
-buttons, or scroll the track list with the mouse wheel.
-
-<details>
-<summary>Controls</summary>
+## Keys
 
 | Key | Action |
 | --- | --- |
-| `Space` | Play or pause |
-| `n` / `p` | Next / previous track |
-| `←` / `→` | Seek 10 seconds, 30 in a podcast episode |
-| `+` / `-` | Volume |
-| `s` / `r` | Shuffle / cycle repeat |
-| `↑` / `↓` / `PgUp` / `PgDn` | Choose a row |
-| `Enter` | Play the selected track |
-| `o` / `a` | Open the selected track's album / artist |
-| `z` | Add the selected track to the queue |
-| `Esc` / `Backspace` | Go back |
-| `/` / `Ctrl+F` | Search |
-| `Tab` / `Shift+Tab` | Move between controls and panes |
-| `f` | Search your library |
-| `b` | Show or hide the sidebar |
-| `?` | Show controls |
-| `q` / `Ctrl+C` | Quit |
+| `Space` | play or pause |
+| `n` / `p` | next / previous track |
+| `←` / `→` | seek 10 seconds, 30 in a podcast episode |
+| `+` / `-` | volume |
+| `s` / `r` | shuffle / cycle repeat |
+| `↑` `↓` `j` `k`, `gg` / `G` | choose a row, first / last row |
+| `Enter` | play the selected track |
+| `o` / `a` | open the track's album / artist |
+| `z` | add the track to the queue |
+| `/`, `Ctrl+F` / `f` | search the catalog / your library |
+| `Tab`, `h` `l` | sidebar, list and search boxes |
+| `b` | show or hide the sidebar |
+| `Esc` / `Backspace` | go back |
+| `?` | show the keys |
+| `q` / `Ctrl+C` | quit |
 
-Single-key shortcuts apply outside text inputs; the `[keys]` settings change them.
+Single keys work outside text fields; the `[keys]` settings change all of them
+but the ones that move in the lists.
 
-</details>
+## Settings
 
-### Settings
-
-`spt` reopens the view it showed when it closed (a playlist, an album, an
-artist, a search) on the row that was selected. It keeps them in
-`$XDG_STATE_HOME/spt/view.json` (`~/.local/state/spt/view.json`).
-
-Everything else comes from `$XDG_CONFIG_HOME/spt/config.toml`
-(`~/.config/spt/config.toml`), or the file `--config` names. The file and each
-setting are optional; here is every setting with its default:
+`~/.config/spt/config.toml` (or `$XDG_CONFIG_HOME/spt/config.toml`, or the file
+`--config` names) is read at start. The file and each setting are optional; here
+is every one with its default:
 
 ```toml
 [layout]
@@ -263,87 +209,89 @@ reconnect_seconds = 5
 browser = "xdg-open"    # opens the login page; "open" on macOS
 ```
 
-`spt` reads the file when it starts, and refuses to start on a mistake in it;
-`spt check-config` checks it without starting.
+`spt check-config` checks the file without starting, `spt devices` lists the
+audio outputs `output` can name. `spt` refuses to start on a mistake in the file
+and names the line.
+
+The view and the row you left are kept in `~/.local/state/spt/view.json`, the
+device ID beside them, and played tracks in `~/.cache/spt/audio`.
+
+**Home Manager.** The file is plain TOML, so `xdg.configFile` writes it:
+
+```nix
+xdg.configFile."spt/config.toml".source = (pkgs.formats.toml { }).generate "spt.toml" {
+  layout = { player = "top"; borders = "square"; };
+  theme.accent = "#cba6f7";
+};
+```
 
 ## How it works
 
-- **Browser login.** Spotify's OAuth authorization-code flow uses PKCE and a
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/architecture-dark.png">
+    <img src="docs/images/architecture-light.png" alt="the terminal, one spt process, and Spotify" width="100%">
+  </picture>
+</p>
+
+- **Browser login.** Spotify's OAuth authorization-code flow with PKCE and a
   local callback on `127.0.0.1:8898`. The refresh token lives in the system
   credential store.
-- **Library and catalog.** Playlists, contexts, search and track metadata use
-  Spotify's internal services through a librespot session. The app does not use
-  the public Spotify Web API.
-- **Local playback.** An in-process Spotify Connect speaker streams audio through
-  Rodio. Player events update the now-playing bar.
-- **HTML views, Rust state.** Hypercmd compiles the [HTML templates](ui/) at build
-  time and connects them to [Rust state](src/jukebox/). Templates, styles and
-  embedded assets are included in the crate package.
+- **Library and catalog** come from Spotify's internal services through a
+  [librespot](https://github.com/librespot-org/librespot) session, not from the
+  public Web API.
+- **Local playback.** An in-process Spotify Connect speaker streams the audio
+  through Rodio; its events drive the player bar and MPRIS.
+- **HTML views, Rust state.** [Hypercmd](https://github.com/fusor-rs/hypercmd)
+  compiles the [HTML templates](ui/) and their CSS at build time and binds them to
+  the [Rust state](src/jukebox/). The theme is laid over that stylesheet at start,
+  so a new theme needs no new build.
 
-## Status and known limitations
+## Troubleshooting
 
-spotify-tui is in early development and requires Spotify Premium for playback.
+- **No cover.** Covers need kitty, true color, and inside tmux
+  `set -g allow-passthrough on`. `interface.covers = false` turns them off.
+- **Login lost at every start.** No Secret Service provider runs: start GNOME
+  Keyring or another one on the session D-Bus.
+- **No sound, or the wrong output.** `spt devices` lists the outputs, and
+  `playback.output` picks one.
+- **Two players.** A second `spt` registers on MPRIS as `spt.instance<PID>`, and
+  Spotify plays on one device of an account at a time.
 
-| Capability | Status |
-| --- | --- |
-| Library | Liked Songs, playlists and recent plays |
-| Discovery | Catalog search and album / artist navigation |
-| Playback | Local audio, seeking, volume, shuffle and repeat |
-| Spotify Connect | Control this player's playback from other Spotify apps |
-| Queue | Add tracks to the queue |
-| Media controls | MPRIS on Linux, for `playerctl` and media keys |
-| Album covers | In kitty, including inside tmux |
-| Login storage | macOS Keychain or Linux Secret Service |
-| Terminal platforms | macOS and Linux |
+## Development
 
-Viewing or reordering the queue, media keys on macOS, liking tracks, podcasts and controlling other devices from the
-terminal are not implemented. Windows is not supported. Spotify's internal
-services are undocumented and can change independently of this app.
-
-## Contributing
-
-Views and styles live in `ui/`, application state in `src/jukebox/`, and login,
-catalog and playback integration in `src/spotify/`. Dependency versions are pinned.
-
-Run the checks before submitting a change:
+Views and styles live in `ui/`, the state in `src/jukebox/`, the settings in
+`src/config.rs` and `src/theme.rs`, and Spotify in `src/spotify/`. Dependency
+versions are pinned.
 
 ```sh
-sh -n install.sh
+nix develop          # or a Rust toolchain with ALSA and OpenSSL
 cargo fmt --all -- --check
 cargo clippy --all-targets --locked -- -D warnings
 cargo test --locked
-cargo publish --locked --dry-run
 ```
 
-The [Check workflow](.github/workflows/check.yml) runs on Linux and macOS for
-pushes and pull requests. It checks formatting and lints, runs tests, verifies
-the packaged crate, and launches the executable's help and version commands.
+The README images come from real captures: `docs/images/render.py` draws them
+from `tmux capture-pane -e` output, album covers included.
 
-### Releases
+**Releases.** Bump the version in `Cargo.toml` and `Cargo.lock`, then publish a
+GitHub release tagged `vVERSION`: the [Release workflow](.github/workflows/release.yml)
+checks the tag, builds x86-64 and ARM64 binaries for Linux and macOS, tests each
+with [install.sh](install.sh), and attaches them with their checksums.
 
-Create a GitHub environment named `crates-io` with a `CARGO_REGISTRY_TOKEN` secret
-authorized to publish `fusor-spotify-tui`. Commit the release version in
-`Cargo.toml` and `Cargo.lock`, then publish a GitHub release with the matching
-`vVERSION` tag, such as `v0.1.1`.
+## Acknowledgements
 
-The [Release workflow](.github/workflows/release.yml) runs Check, validates the
-tag against the manifest, and builds x86-64 and ARM64 executables on Linux and
-macOS. Linux builds use Ubuntu 22.04 with GNU targets to link the audio and TLS
-libraries. Each archive contains `spt`, `LICENSE`, and `README.md` in a directory
-named `spotify-tui-VERSION-TARGET`. Archives have a `.tar.gz` extension and an
-accompanying `.tar.gz.sha256` checksum file.
+spotify-terminal began as a fork of [fusor-rs/spotify-tui](https://github.com/fusor-rs/spotify-tui)
+by Fusor, and grew from there. It plays through
+[librespot](https://github.com/librespot-org/librespot) and draws with
+[Hypercmd](https://github.com/fusor-rs/hypercmd) and [Fusor](https://github.com/fusor-rs/fusor).
 
-Each build uses [install.sh](install.sh) to verify, install and run its executable
-before uploading artifacts. It also checks that a corrupt download leaves the
-installed executable unchanged. `SPOTIFY_TUI_DOWNLOAD_BASE` points the installer
-at local archives during these checks.
+## Legal
 
-After all builds pass, the workflow attaches the archives to the GitHub release
-and publishes the crate to crates.io. Reruns skip an already published crate
-version and replace release assets. The installer is attached after both steps
-succeed. Running Release manually verifies the crate and produces binary workflow
-artifacts without publishing a crate or uploading GitHub release assets.
+Spotify is a trademark of Spotify AB. This project is not affiliated with,
+sponsored or endorsed by Spotify. It needs your own Premium account and plays
+only what that account may play.
 
 ## License
 
-Licensed under the [MIT License](LICENSE).
+[MIT](LICENSE).

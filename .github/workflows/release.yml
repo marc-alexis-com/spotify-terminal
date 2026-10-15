@@ -64,7 +64,7 @@ jobs:
         env:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
-          name="spotify-tui-$VERSION-$TARGET"
+          name="spotify-terminal-$VERSION-$TARGET"
           staging="$RUNNER_TEMP/$name"
           artifacts="$RUNNER_TEMP/artifacts/v$VERSION"
           mkdir -p "$staging" "$artifacts"
@@ -72,10 +72,10 @@ jobs:
           COPYFILE_DISABLE=1 tar -czf "$artifacts/$name.tar.gz" -C "$RUNNER_TEMP" "$name"
           cd "$artifacts"
           shasum -a 256 "$name.tar.gz" > "$name.tar.gz.sha256"
-          export SPOTIFY_TUI_DOWNLOAD_BASE="file://$RUNNER_TEMP/artifacts"
-          export SPOTIFY_TUI_INSTALL="$RUNNER_TEMP/installed spotify-tui"
+          export SPOTIFY_TERMINAL_DOWNLOAD_BASE="file://$RUNNER_TEMP/artifacts"
+          export SPOTIFY_TERMINAL_INSTALL="$RUNNER_TEMP/installed spotify-terminal"
           sh "$GITHUB_WORKSPACE/install.sh" "v$VERSION"
-          "$SPOTIFY_TUI_INSTALL/bin/spt" --help
+          "$SPOTIFY_TERMINAL_INSTALL/bin/spt" --help
           cp "$name.tar.gz" "$RUNNER_TEMP/intact.tar.gz"
           printf 'corrupt download' >> "$name.tar.gz"
           if sh "$GITHUB_WORKSPACE/install.sh" "$VERSION" > "$RUNNER_TEMP/rejected.log" 2>&1; then
@@ -84,11 +84,11 @@ jobs:
           fi
           cat "$RUNNER_TEMP/rejected.log"
           grep -Fx 'error: checksum mismatch; download the release again' "$RUNNER_TEMP/rejected.log"
-          cmp "$staging/spt" "$SPOTIFY_TUI_INSTALL/bin/spt"
+          cmp "$staging/spt" "$SPOTIFY_TERMINAL_INSTALL/bin/spt"
           mv "$RUNNER_TEMP/intact.tar.gz" "$name.tar.gz"
       - uses: actions/upload-artifact@v4
         with:
-          name: spotify-tui-${{ matrix.target }}
+          name: spotify-terminal-${{ matrix.target }}
           path: ${{ runner.temp }}/artifacts/v${{ steps.version.outputs.version }}/*
           if-no-files-found: error
           compression-level: 0
@@ -103,7 +103,7 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          pattern: spotify-tui-*
+          pattern: spotify-terminal-*
           path: artifacts
           merge-multiple: true
       - name: Attach release archives
@@ -112,49 +112,9 @@ jobs:
           RELEASE_TAG: ${{ github.event.release.tag_name }}
         run: gh release upload "$RELEASE_TAG" artifacts/* --clobber --repo "$GITHUB_REPOSITORY"
 
-  crates-io:
-    if: github.event_name == 'release'
-    needs: binaries
-    runs-on: ubuntu-22.04
-    environment: crates-io
-    timeout-minutes: 45
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-      - name: Install Linux build dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install --yes pkg-config libasound2-dev libssl-dev
-      - name: Publish an unreleased crate version
-        env:
-          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
-        run: |
-          package=$(cargo metadata --locked --no-deps --format-version 1 | jq -er '.packages[0]')
-          name=$(jq -r '.name' <<< "$package")
-          version=$(jq -r '.version' <<< "$package")
-          index="$RUNNER_TEMP/crate-index.json"
-          status=$(curl --silent --show-error --output "$index" --write-out '%{http_code}' \
-            "https://index.crates.io/${name:0:2}/${name:2:2}/$name")
-          case "$status" in
-            200)
-              published=$(jq --slurp --arg version "$version" 'any(.[]; .vers == $version)' "$index")
-              if [ "$published" = true ]; then
-                echo "$name $version is already published."
-                exit 0
-              fi
-              ;;
-            404) ;;
-            *)
-              echo "::error::Registry lookup for $name failed with HTTP $status"
-              exit 1
-              ;;
-          esac
-          cargo publish --locked
-
   ready:
     if: github.event_name == 'release'
-    needs: [attach, crates-io]
+    needs: attach
     runs-on: ubuntu-22.04
     timeout-minutes: 10
     permissions:

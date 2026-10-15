@@ -28,6 +28,7 @@ const REQUEST_TIMEOUT: Duration = Duration::from_secs(10);
 const LOGIN_TIMEOUT: Duration = Duration::from_secs(10 * 60);
 /// How long a token request may take, from connecting to the end of the body.
 const TOKEN_TIMEOUT: Duration = Duration::from_secs(30);
+/// The name from before the project was spotify-terminal, kept so that logins survive.
 const KEYRING_SERVICE: &str = "spotify-tui";
 const KEYRING_ACCOUNT: &str = "refresh-token";
 const CALLBACK_PAGE: &str = include_str!("../../assets/callback.html");

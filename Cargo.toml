@@ -1,11 +1,12 @@
 [package]
-name = "fusor-spotify-tui"
-version = "0.1.1"
+name = "spotify-terminal"
+version = "0.2.0"
 edition = "2024"
 license = "MIT"
-description = "A Spotify client for the terminal, written in HTML with Hypercmd"
+description = "Play Spotify in your terminal: library, search, artist pages, album covers, themes"
 readme = "README.md"
-repository = "https://github.com/fusor-rs/spotify-tui"
+repository = "https://github.com/marc-alexis-com/spotify-terminal"
+homepage = "https://github.com/marc-alexis-com/spotify-terminal"
 keywords = ["spotify", "terminal", "music", "tui"]
 categories = ["command-line-utilities", "multimedia::audio"]
 include = ["src/**", "ui/**", "assets/**", "build.rs", "Cargo.toml", "Cargo.lock", "LICENSE", "README.md"]

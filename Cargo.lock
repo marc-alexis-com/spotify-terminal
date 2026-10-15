@@ -1026,38 +1026,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "fusor-spotify-tui"
-version = "0.1.1"
-dependencies = [
- "base64 0.22.1",
- "cpal",
- "fusor-components",
- "fusor-core",
- "http",
- "hypercmd",
- "hypercmd-build",
- "image",
- "keyring",
- "librespot-connect",
- "librespot-core",
- "librespot-metadata",
- "librespot-playback",
- "librespot-protocol",
- "protobuf",
- "rand 0.9.2",
- "reqwest 0.13.5",
- "rustix 1.1.4",
- "serde",
- "serde_json",
- "sha2",
- "signal-hook",
- "thiserror 2.0.21",
- "tokio",
- "toml",
- "zbus 5.19.0",
-]
-
-[[package]]
 name = "futures-channel"
 version = "0.3.34"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3646,6 +3614,38 @@ checksum = "d91ed6c858b01f942cd56b37a94b3e0a1798290327d1236e4d9cf4eaca44d29d"
 dependencies = [
  "base64ct",
  "der",
+]
+
+[[package]]
+name = "spotify-terminal"
+version = "0.2.0"
+dependencies = [
+ "base64 0.22.1",
+ "cpal",
+ "fusor-components",
+ "fusor-core",
+ "http",
+ "hypercmd",
+ "hypercmd-build",
+ "image",
+ "keyring",
+ "librespot-connect",
+ "librespot-core",
+ "librespot-metadata",
+ "librespot-playback",
+ "librespot-protocol",
+ "protobuf",
+ "rand 0.9.2",
+ "reqwest 0.13.5",
+ "rustix 1.1.4",
+ "serde",
+ "serde_json",
+ "sha2",
+ "signal-hook",
+ "thiserror 2.0.21",
+ "tokio",
+ "toml",
+ "zbus 5.19.0",
 ]
 
 [[package]]
