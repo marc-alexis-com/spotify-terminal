@@ -85,13 +85,14 @@ async fn send(_: &str, _: &str, _: &str, _: i32) -> Result<(), Error> {
 }
 
 /// The body may hold markup for some daemons: names keep their `&`, `<` and `>`.
+#[cfg(target_os = "linux")]
 fn escape(text: &str) -> String {
     text.replace('&', "&amp;")
         .replace('<', "&lt;")
         .replace('>', "&gt;")
 }
 
-#[cfg(test)]
+#[cfg(all(test, target_os = "linux"))]
 mod tests {
     #[test]
     fn names_keep_their_signs() {

@@ -46,6 +46,7 @@ pub(crate) enum Error {
     Output(String),
     #[error("Spotify sent no {0}")]
     Missing(String),
+    #[cfg(target_os = "linux")]
     #[error("Desktop notification failed ({0}); notifications.enabled = false turns them off")]
     Notify(String),
     #[error("Spotify did not send the artist's page ({0})")]
