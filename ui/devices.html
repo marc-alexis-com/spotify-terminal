@@ -1,0 +1,17 @@
+<template rust:component="DeviceList">
+  <section class="overlay">
+    <div class="dialog">
+      <div class="dialog-heading">
+        <h2 class="dialog-title">Play on</h2>
+        <button on:click="state.jukebox.close_devices()">Close  Esc</button>
+      </div>
+      <div id="device-list" class="picker-list">
+        <ForEach items="{{ state.jukebox.device_list() }}" key="{{ |device| device.id.clone() }}" item="device">
+          <button class="pick" autofocus on:click="state.jukebox.play_on(&device.get())"
+                  on:keydown="state.jukebox.devices_key(&event)">{{ Jukebox::device_label(&device.get()) }}</button>
+        </ForEach>
+      </div>
+      <p class="dialog-hint">Enter moves the music there · Esc closes</p>
+    </div>
+  </section>
+</template>

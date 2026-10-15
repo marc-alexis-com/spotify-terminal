@@ -7,7 +7,7 @@
       <If condition="{{ state.player_on_top() }}">
         <PlayerBar jukebox="{{ state.clone() }}"></PlayerBar>
       </If>
-      <div class="body" class:hidden="{{ state.help.get() || state.picker_shown() }}">
+      <div class="body" class:hidden="{{ state.help.get() || state.picker_shown() || state.lyrics_shown() || state.devices_shown() || state.renaming_shown() }}">
         <Shelves jukebox="{{ state.clone() }}"></Shelves>
         <TrackList jukebox="{{ state.clone() }}"></TrackList>
       </div>
@@ -16,6 +16,15 @@
       </If>
       <If condition="{{ state.picker_shown() }}">
         <PlaylistPicker jukebox="{{ state.clone() }}"></PlaylistPicker>
+      </If>
+      <If condition="{{ state.lyrics_shown() }}">
+        <LyricsView jukebox="{{ state.clone() }}"></LyricsView>
+      </If>
+      <If condition="{{ state.devices_shown() }}">
+        <DeviceList jukebox="{{ state.clone() }}"></DeviceList>
+      </If>
+      <If condition="{{ state.renaming_shown() }}">
+        <RenamePlaylist jukebox="{{ state.clone() }}"></RenamePlaylist>
       </If>
       <If condition="{{ !state.player_on_top() }}">
         <PlayerBar jukebox="{{ state.clone() }}"></PlayerBar>

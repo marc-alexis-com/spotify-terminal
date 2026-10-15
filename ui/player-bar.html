@@ -26,6 +26,7 @@
       </div>
       <div class="side">
         <div class="modes">
+          <p class="sleep" class:hidden="{{ state.jukebox.sleep_label().is_empty() }}">{{ state.jukebox.sleep_label() }}</p>
           <button class="control" class:on="{{ state.jukebox.shuffle_on() }}"
                   on:click="state.jukebox.toggle_shuffle()">{{ crate::icons::get().shuffle }}</button>
           <button class="control" class:on="{{ state.jukebox.repeat_mode() != Repeat::Off }}"

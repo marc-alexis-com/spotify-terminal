@@ -1,6 +1,8 @@
 mod actions;
+mod arrange;
 mod artist;
 mod browse;
+mod extras;
 mod header;
 mod keys;
 mod library;
@@ -119,6 +121,26 @@ pub(crate) struct Jukebox {
     unliked: RefCell<HashMap<String, u32>>,
     /// Where podcast episodes were left, here or on another device.
     resume: Signal<HashMap<String, spotify::Resume>>,
+    /// When the sleep timer pauses the music, if it runs.
+    sleep: Signal<Option<extras::Sleep>>,
+    /// Whether the lyrics show, and those loaded last.
+    lyrics_open: Signal<bool>,
+    lyrics: Signal<Option<extras::Lyrics>>,
+    /// The account's devices, while their list is open.
+    devices: Signal<Option<Vec<Rc<spotify::Device>>>>,
+    /// The rename field of the listed playlist, while it is open.
+    renaming: Signal<bool>,
+    rename_text: Signal<String>,
+    /// The order of the listed tracks.
+    sort: Signal<arrange::Sort>,
+    /// What the filter field holds.
+    filter: Signal<String>,
+    /// Whether the filter field shows.
+    filtering: Signal<bool>,
+    /// The listed tracks in Spotify's order, while another order or a filter shows.
+    full: RefCell<Option<Listing>>,
+    /// Whether the whole list loads, for an order or a filter.
+    load_all: Cell<bool>,
     /// The tracks queued here that have not played yet, in order.
     queue: RefCell<Vec<String>>,
     /// The list the playing track was started from, for what comes next.
@@ -142,6 +164,10 @@ impl FromInputs for Jukebox {
     type Inputs = Startup;
     type Error = Error;
 
+    #[expect(
+        clippy::too_many_lines,
+        reason = "one line for each piece of the player's state"
+    )]
     fn from_inputs(startup: Startup, owner: OwnerHandle) -> Result<Self, Error> {
         let screen = match startup.refresh_token {
             Some(_) => Screen::Connecting,
@@ -190,6 +216,17 @@ impl FromInputs for Jukebox {
             liked_at: Rc::default(),
             unliked: RefCell::new(memory::recall_unliked()),
             resume: signal(memory::recall_episodes()),
+            sleep: signal(None),
+            lyrics_open: signal(false),
+            lyrics: signal(None),
+            devices: signal(None),
+            renaming: signal(false),
+            rename_text: signal(String::new()),
+            sort: signal(arrange::Sort::default()),
+            filter: signal(String::new()),
+            filtering: signal(false),
+            full: RefCell::new(None),
+            load_all: Cell::new(false),
             queue: RefCell::new(Vec::new()),
             playing_list: RefCell::new(Vec::new()),
             list_position: RefCell::new(None),

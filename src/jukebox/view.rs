@@ -27,6 +27,9 @@ jukebox_views! {
     Help => "ui/help.html",
     SearchResults => "ui/results.html",
     PlaylistPicker => "ui/picker.html",
+    LyricsView => "ui/lyrics.html",
+    DeviceList => "ui/devices.html",
+    RenamePlaylist => "ui/rename.html",
 }
 
 fusor::template!(backend = "hypercmd", "ui/app.html");

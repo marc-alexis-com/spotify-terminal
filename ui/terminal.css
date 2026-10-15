@@ -136,6 +136,10 @@ th, td { white-space: pre; overflow: hidden; }
 .dialog-heading { flex-direction: row; height: 1ch; }
 .dialog-title { flex-grow: 1; }
 .keys { overflow: auto; }
+.lyric-lines { flex-grow: 1; flex-shrink: 1; min-height: 0; overflow: hidden; }
+.lyric { white-space: pre-wrap; }
+.sung { font-weight: bold; }
+.sleep { height: 1ch; white-space: pre; }
 .picker-list { flex-grow: 1; flex-shrink: 1; min-height: 0; max-height: 16ch; overflow: auto; }
 .pick { height: 1ch; padding: 0 1ch; white-space: pre; overflow: hidden; }
 .pick:focus { text-decoration: none; }

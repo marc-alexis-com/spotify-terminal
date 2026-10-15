@@ -24,6 +24,7 @@ pub(crate) struct Config {
     pub(crate) keys: Keys,
     pub(crate) notifications: Notifications,
     pub(crate) podcasts: Podcasts,
+    pub(crate) sleep: SleepTimer,
     pub(crate) system: System,
 }
 
@@ -380,6 +381,21 @@ impl Default for Podcasts {
         Self {
             resume: true,
             mark_played: true,
+        }
+    }
+}
+
+/// The durations the sleep timer key goes through, then the end of the track.
+#[derive(Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub(crate) struct SleepTimer {
+    pub(crate) minutes: Vec<u64>,
+}
+
+impl Default for SleepTimer {
+    fn default() -> Self {
+        Self {
+            minutes: vec![15, 30, 45, 60],
         }
     }
 }

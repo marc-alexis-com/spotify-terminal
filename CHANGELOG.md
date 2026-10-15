@@ -7,12 +7,20 @@
   taken back keeps its date: liking the track again puts it back in its place.
 - **Playlists.** `t` adds the row to a playlist, chosen in a picker that filters
   as you type; a new name creates the playlist.
-- **Queue.** `u` and the sidebar's Up next show the queued tracks, then the rest
-  of the list, as they will play.
+- **Queue.** `u` and the sidebar's Up next show what plays next on the account,
+  wherever it plays, read from Spotify Connect.
 - **Albums and podcasts** get a header: cover, makers, year, label, count.
 - **Notifications** on Linux when a track starts, with its cover; configurable.
 - **Podcasts.** Episodes start where this computer left them, and ✓ and ◐ mark
   the played and begun ones.
+- **Sort and filter** any list (`S`, `F`): title, artist, album, length, or the
+  date liked; the whole list loads first.
+- **Lyrics** (`y`), timed, the sung line lit.
+- **Radio** (`R`) of the selected track, going on as Spotify's radio does.
+- **Devices** (`D`): move the music to another device of the account.
+- **Your Episodes** in the sidebar.
+- **Sleep timer** (`Z`): 15, 30, 45, 60 minutes or the end of the track (`[sleep]`).
+- **Playlist edits**: take a track out (`X`), move it (`K`, `J`), rename (`E`).
 - **Fix.** A title too long for its column no longer runs into the next one.
 - Changes to the library go through the session, like the desktop app: the
   public Web API answers this client with "too many requests".

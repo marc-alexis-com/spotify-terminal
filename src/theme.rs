@@ -114,6 +114,9 @@ const PAINTED: &[Painted] = &[
     (&[Class("dialog-hint")], &[(Fg, Role::Subtext)]),
     (&[Class("keys")], &[(Fg, Role::Text)]),
     (&[Class("pick")], &[(Fg, Role::Subtext)]),
+    (&[Class("lyric")], &[(Fg, Role::Muted)]),
+    (&[Class("sung")], &[(Fg, Role::Accent)]),
+    (&[Class("sleep")], &[(Fg, Role::Accent)]),
     (
         &[Class("pick"), Focus],
         &[(Fg, Role::Text), (Bg, Role::Surface)],

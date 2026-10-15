@@ -1,0 +1,15 @@
+<template rust:component="LyricsView">
+  <section class="overlay">
+    <div class="dialog lyrics">
+      <div class="dialog-heading">
+        <h2 class="dialog-title">{{ state.jukebox.lyrics_title() }}</h2>
+        <button on:click="state.jukebox.close_lyrics()">Close  Esc</button>
+      </div>
+      <div class="lyric-lines">
+        <ForEach items="{{ state.jukebox.lyric_lines() }}" key="{{ |line| line.0 }}" item="line">
+          <p class="lyric" class:sung="{{ line.get().2 }}">{{ line.get().1.clone() }}</p>
+        </ForEach>
+      </div>
+    </div>
+  </section>
+</template>

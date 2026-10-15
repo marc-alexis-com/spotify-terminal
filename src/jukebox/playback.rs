@@ -162,6 +162,7 @@ impl Jukebox {
             }
             self.clock.update(|clock| *clock += 1);
             self.remember_view();
+            self.check_sleep();
             let episode = self.now.with_untracked(|now| {
                 let length = now
                     .track
@@ -311,11 +312,12 @@ impl Jukebox {
         }
         self.dequeue(&uri);
         self.refresh_queue();
+        self.sleep_on_track_change();
         let Some(catalog) = self.catalog() else {
             self.now.update(|now| now.describe(&uri, fallback));
             return;
         };
-        let (now, http) = (self.now.clone(), self.http.clone());
+        let (now, http, jukebox) = (self.now.clone(), self.http.clone(), self.clone());
         let started = self.spawn(async move {
             // A failed or empty answer would otherwise leave "Loading…" for the whole track.
             let found = catalog.tracks(vec![uri.clone()]).await;
@@ -326,6 +328,7 @@ impl Jukebox {
                 .unwrap_or(fallback);
             let notified = crate::notify::track_started(http, &track, cover).await;
             now.update(|now| now.describe(&uri, track));
+            jukebox.load_lyrics();
             found.map(drop).and(notified)
         });
         if let Err(error) = started {
@@ -517,6 +520,11 @@ impl Jukebox {
                 Duration::from_millis(track.duration_ms)
             })
         })
+    }
+
+    /// How far the playing track is, in milliseconds.
+    pub(super) fn elapsed_ms(&self) -> u64 {
+        u64::try_from(self.elapsed().as_millis()).unwrap_or(u64::MAX)
     }
 
     pub(super) fn elapsed_label(&self) -> String {

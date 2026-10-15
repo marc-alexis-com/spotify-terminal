@@ -8,8 +8,8 @@ use http::{
 };
 use librespot_core::SpotifyId;
 use librespot_protocol::playlist4_external::{
-    Add, CreateListReply, Delta, Item, ListAttributes, ListChanges, ListUpdateRequest, Op,
-    SelectedListContent, op,
+    Add, CreateListReply, Delta, Item, ListAttributes, ListAttributesPartialState, ListChanges,
+    ListUpdateRequest, Mov, Op, Rem, SelectedListContent, UpdateListAttributes, op,
 };
 use protobuf::{CodedOutputStream, EnumOrUnknown, Message, MessageField};
 use std::collections::HashMap;
@@ -22,6 +22,13 @@ const EPISODES_SET: &str = "listenlater";
 const COLLECTION_TYPE: &str = "application/vnd.collection-v2.spotify.proto";
 /// Items in one page of the collection.
 const PAGE_SIZE: i32 = 500;
+
+/// Which way a track moves in a playlist.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) enum Direction {
+    Up,
+    Down,
+}
 
 /// Where a podcast episode was left.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -74,7 +81,15 @@ impl Catalog {
 
     /// Liked Songs with the date each track was liked, by URI.
     pub(crate) async fn liked_dates(&self) -> Result<HashMap<String, u32>, Error> {
-        run(all_liked(self.session.clone())).await
+        run(collection(self.session.clone(), LIKED_SET)).await
+    }
+
+    /// The episodes saved to Your Episodes, last saved first.
+    pub(crate) async fn saved_episodes(&self) -> Result<Vec<String>, Error> {
+        let saved = run(collection(self.session.clone(), EPISODES_SET)).await?;
+        let mut saved: Vec<_> = saved.into_iter().collect();
+        saved.sort_by_key(|(_, added_at)| std::cmp::Reverse(*added_at));
+        Ok(saved.into_iter().map(|(uri, _)| uri).collect())
     }
 
     /// Adds tracks or episodes at the end of a playlist.
@@ -99,6 +114,116 @@ impl Catalog {
                     &format!("/playlist/v2/playlist/{id}/changes"),
                     None,
                     &changes,
+                )
+                .await?;
+            Ok(())
+        })
+        .await
+    }
+
+    /// Takes the first `uri` out of a playlist.
+    pub(crate) async fn remove_from_playlist(
+        &self,
+        playlist: &str,
+        uri: String,
+    ) -> Result<(), Error> {
+        self.change_playlist(playlist, move |items| {
+            let index = items.iter().position(|item| *item == uri)?;
+            Some(Op {
+                kind: Some(EnumOrUnknown::new(op::Kind::REM)),
+                rem: MessageField::some(Rem {
+                    from_index: Some(i32::try_from(index).ok()?),
+                    length: Some(1),
+                    items: vec![Item {
+                        uri: Some(uri),
+                        ..Item::default()
+                    }],
+                    ..Rem::default()
+                }),
+                ..Op::default()
+            })
+        })
+        .await
+    }
+
+    /// Moves the first `uri` of a playlist one place up, or down.
+    pub(crate) async fn move_in_playlist(
+        &self,
+        playlist: &str,
+        uri: String,
+        direction: Direction,
+    ) -> Result<(), Error> {
+        self.change_playlist(playlist, move |items| {
+            let index = items.iter().position(|item| *item == uri)?;
+            // The target is where the item goes before, counted before it moves.
+            let to = match direction {
+                Direction::Up => index.checked_sub(1)?,
+                Direction::Down => (index + 2 <= items.len()).then_some(index + 2)?,
+            };
+            Some(Op {
+                kind: Some(EnumOrUnknown::new(op::Kind::MOV)),
+                mov: MessageField::some(Mov {
+                    from_index: Some(i32::try_from(index).ok()?),
+                    length: Some(1),
+                    to_index: Some(i32::try_from(to).ok()?),
+                    ..Mov::default()
+                }),
+                ..Op::default()
+            })
+        })
+        .await
+    }
+
+    /// Gives a playlist a new name.
+    pub(crate) async fn rename_playlist(&self, playlist: &str, name: String) -> Result<(), Error> {
+        self.change_playlist(playlist, move |_| {
+            Some(Op {
+                kind: Some(EnumOrUnknown::new(op::Kind::UPDATE_LIST_ATTRIBUTES)),
+                update_list_attributes: MessageField::some(UpdateListAttributes {
+                    new_attributes: MessageField::some(ListAttributesPartialState {
+                        values: MessageField::some(ListAttributes {
+                            name: Some(name),
+                            ..ListAttributes::default()
+                        }),
+                        ..ListAttributesPartialState::default()
+                    }),
+                    ..UpdateListAttributes::default()
+                }),
+                ..Op::default()
+            })
+        })
+        .await
+    }
+
+    /// Reads a playlist, then sends the change `op` makes of its items, on its
+    /// current revision; `op` returns nothing when the change cannot be made.
+    async fn change_playlist(
+        &self,
+        playlist: &str,
+        op: impl FnOnce(&[String]) -> Option<Op> + Send + 'static,
+    ) -> Result<(), Error> {
+        let (session, playlist) = (self.session.clone(), playlist.to_owned());
+        run(async move {
+            let id = playlist.strip_prefix(PLAYLIST_PREFIX).unwrap_or(&playlist);
+            let current = session
+                .spclient()
+                .get_playlist(&SpotifyId::from_base62(id)?)
+                .await?;
+            let current = SelectedListContent::parse_from_bytes(&current)?;
+            let items: Vec<String> = current
+                .contents
+                .items
+                .iter()
+                .map(|item| item.uri().to_owned())
+                .collect();
+            let op = op(&items).ok_or_else(|| Error::Missing("place for this change".into()))?;
+            session
+                .spclient()
+                .request_with_protobuf(
+                    &Method::POST,
+                    &format!("/playlist/v2/playlist/{id}/changes"),
+                    None,
+                    &changes(current.revision, op),
                 )
                 .await?;
             Ok(())
@@ -213,11 +338,15 @@ fn collection_write(
     Ok(body)
 }
 
-async fn all_liked(session: librespot_core::Session) -> Result<HashMap<String, u32>, Error> {
+/// A collection set with the date of each item, by URI.
+async fn collection(
+    session: librespot_core::Session,
+    set: &'static str,
+) -> Result<HashMap<String, u32>, Error> {
     let mut liked = HashMap::new();
     let mut page = String::new();
     loop {
-        let body = page_request(&session.username(), LIKED_SET, &page)?;
+        let body = page_request(&session.username(), set, &page)?;
         let reply = session
             .spclient()
             .request(

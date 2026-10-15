@@ -27,7 +27,13 @@ all come from one settings file.
 | **Library** | Liked Songs, playlists in their folders, recently played, and a search of your own library |
 | **Likes** | a heart on every liked track; like or unlike the row or what plays, in one key |
 | **Playlists** | add the row to one of your playlists, or to a new one, from a picker that filters as you type |
-| **Queue** | add to it, and see what comes next: the tracks you queued, then the rest of the list |
+| **Queue** | add to it, and see what comes next on the account, wherever it plays: the queue, then the list |
+| **Sort and filter** | any list by title, artist, album, length or date liked; narrow it as you type |
+| **Lyrics** | timed lyrics, the sung line lit as the track plays |
+| **Radio** | tracks like the selected one, as Spotify's radio plays them, going on once they end |
+| **Devices** | move the music to your phone, a speaker or this computer |
+| **Sleep timer** | the music stops after 15, 30, 45 or 60 minutes, or at the end of the track |
+| **Playlist edits** | take a track out, move it up or down, rename the playlist |
 | **Catalog** | search as you type, with songs, artists, albums, playlists and podcasts |
 | **Artists** | picture, monthly listeners, popular tracks with their play counts, discography, related artists |
 | **Albums, podcasts** | a header with the cover, the makers, the year and the label |
@@ -115,6 +121,12 @@ app or client ID is needed.
 | `u` | show what comes next |
 | `H` / `*` | like the row / what plays, or take the like back |
 | `t` | add the row to a playlist |
+| `S` / `F` | sort the list / filter it |
+| `y` | lyrics |
+| `R` | the row's radio |
+| `D` | play on another device |
+| `Z` | sleep timer |
+| `X`, `K` / `J`, `E` | take the row out of the playlist, move it up / down, rename the playlist |
 | `/`, `Ctrl+F` / `f` | search the catalog / your library |
 | `Tab`, `h` `l` | sidebar, list and search boxes |
 | `b` | show or hide the sidebar |
@@ -209,6 +221,16 @@ like = ["H"]            # the selected row
 like_playing = ["*"]
 show_queue = ["u"]
 add_to_playlist = ["t"]
+sort = ["S"]
+filter = ["F"]
+sleep_timer = ["Z"]
+lyrics = ["y"]
+radio = ["R"]
+devices = ["D"]
+remove_from_playlist = ["X"]
+move_up = ["K"]
+move_down = ["J"]
+rename_playlist = ["E"]
 help = ["?"]
 quit = ["q"]
 back = ["escape", "backspace"]
@@ -222,6 +244,9 @@ covers = true
 [podcasts]
 resume = true           # an episode starts where it was left on this computer
 mark_played = true      # ✓ played, ◐ begun
+
+[sleep]
+minutes = [15, 30, 45, 60] # then the end of the track, then off
 
 [system]
 mpris = true            # media keys and playerctl, on Linux
@@ -237,9 +262,10 @@ The view and the row you left are kept in `~/.local/state/spt/view.json`, where
 episodes were left in `episodes.json` beside it, with the device ID; played tracks
 in `~/.cache/spt/audio`, and the covers of notifications in `~/.cache/spt/covers`.
 
-Spotify lets this client change the library but not read the account's queue nor
-its podcast resume points: `spt` keeps those itself, so the queue view shows what
-was queued here, and episodes resume where this computer left them.
+`spt` reads the account's queue and devices from Spotify Connect, and keeps the
+podcasts' resume points itself: episodes resume where this computer left them.
+A like taken back keeps its date in `unliked.json`, so that liking the track
+again puts it back in its place in Liked Songs.
 
 **Home Manager.** The file is plain TOML, so `xdg.configFile` writes it:
 

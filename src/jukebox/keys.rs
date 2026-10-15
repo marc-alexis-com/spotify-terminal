@@ -5,7 +5,7 @@ use super::{
 };
 use crate::{
     config::{self, Action},
-    spotify::Command,
+    spotify::{Command, Direction},
 };
 use hypercmd::{Error, ErrorKind, Event, EventPayload, Input, Key, Node};
 use std::rc::Rc;
@@ -53,12 +53,27 @@ impl Jukebox {
         if self.screen.get_untracked() != Screen::Library {
             return Ok(());
         }
-        // The picker's own keys handle it while it is open; Esc closes it from anywhere.
-        if self.picker.with_untracked(Option::is_some) {
+        // A dialog's own keys handle it while it is open; Esc closes it from anywhere.
+        let dialog: Option<fn(&Self)> = if self.picker.with_untracked(Option::is_some) {
+            Some(Self::close_picker)
+        } else if self.devices.with_untracked(Option::is_some) {
+            Some(Self::close_devices)
+        } else if self.renaming.get_untracked() {
+            Some(Self::close_rename)
+        } else {
+            None
+        };
+        if let Some(close) = dialog {
             if key == Key::Escape {
-                self.close_picker();
+                close(self);
                 event.prevent_default();
             }
+            return Ok(());
+        }
+        // The lyrics leave the other keys working; Esc closes them.
+        if self.lyrics_open.get_untracked() && key == Key::Escape {
+            self.close_lyrics();
+            event.prevent_default();
             return Ok(());
         }
         if self.help.get_untracked() {
@@ -107,6 +122,16 @@ impl Jukebox {
             Action::LikePlaying => self.like_playing(),
             Action::ShowQueue => self.show_queue(),
             Action::AddToPlaylist => self.pick_playlist(),
+            Action::Sort => self.cycle_sort(),
+            Action::Filter => self.start_filter(),
+            Action::SleepTimer => self.cycle_sleep(),
+            Action::Lyrics => self.toggle_lyrics(),
+            Action::Radio => self.open_radio(),
+            Action::Devices => self.open_devices(),
+            Action::RemoveFromPlaylist => self.remove_from_playlist(),
+            Action::MoveUp => self.move_in_playlist(Direction::Up),
+            Action::MoveDown => self.move_in_playlist(Direction::Down),
+            Action::RenamePlaylist => self.start_rename(),
             Action::Help => self.open_help(),
             Action::Quit => quit()?,
             Action::Back => return Ok(self.back()),

@@ -44,6 +44,7 @@ impl Jukebox {
         let Some((mut listing, window)) = self.history.borrow_mut().pop() else {
             return false;
         };
+        self.reset_arrangement();
         self.to_end.set(false);
         self.generation.set(self.generation.get() + 1);
         let interrupted = listing.loading == Loading::Busy;
@@ -115,6 +116,7 @@ impl Jukebox {
         let Some(catalog) = self.catalog() else {
             return;
         };
+        self.reset_arrangement();
         match &source {
             Source::Playlist(playlist) => self.load_header(&playlist.uri),
             Source::Artist(artist) => self.load_header(&artist.uri),
@@ -140,11 +142,11 @@ impl Jukebox {
     }
 
     /// Loads the details of the next tracks, if the window is close to the loaded end.
-    fn load_more(self: &Rc<Self>) {
+    pub(super) fn load_more(self: &Rc<Self>) {
         let Some(catalog) = self.catalog() else {
             return;
         };
-        let end = if self.to_end.get() {
+        let end = if self.to_end.get() || self.load_all.get() {
             usize::MAX
         } else {
             self.window.with_untracked(|window| window.end()) + PREFETCH_ROWS
@@ -153,6 +155,10 @@ impl Jukebox {
             .listing
             .update(|listing| listing.next_chunk(end, CHUNK));
         let Some(chunk) = chunk else {
+            // The whole list is there for the order or filter that waited for it.
+            if self.load_all.replace(false) {
+                self.arrange();
+            }
             return;
         };
         let generation = self.next_generation();
@@ -399,42 +405,10 @@ impl Jukebox {
         let Some(catalog) = self.catalog() else {
             return Ok(());
         };
-        let play = self.listing.with_untracked(|listing| {
-            let track = track.uri.clone();
-            match &listing.source {
-                // A playlist's context leaves its episodes out, so they would not play.
-                Source::Playlist(_) if listing.has_episodes() => Play::Tracks {
-                    uris: listing.uris.to_vec(),
-                    track,
-                },
-                Source::Liked => Play::Context {
-                    uri: catalog.liked_uri(),
-                    track,
-                },
-                Source::Playlist(playlist) => Play::Context {
-                    uri: playlist.uri.clone(),
-                    track,
-                },
-                Source::Album(album) => Play::Context {
-                    uri: album.uri.clone(),
-                    track,
-                },
-                Source::Artist(artist) => Play::Context {
-                    uri: artist.uri.clone(),
-                    track,
-                },
-                Source::Show(show) => Play::Context {
-                    uri: show.uri.clone(),
-                    track,
-                },
-                Source::Search(_) | Source::Library(_) | Source::Recent | Source::Queue => {
-                    Play::Tracks {
-                        uris: listing.uris.to_vec(),
-                        track,
-                    }
-                }
-            }
-        });
+        let arranged = self.full.borrow().is_some();
+        let play = self
+            .listing
+            .with_untracked(|listing| play_from(listing, track.uri.clone(), arranged, &catalog));
         self.playing_list
             .replace(self.listing.with_untracked(|listing| listing.uris.to_vec()));
         let mode = self.mode();
@@ -554,7 +528,12 @@ impl Jukebox {
     }
 
     pub(super) fn listing_summary(&self) -> String {
-        self.listing.with(Listing::summary)
+        let summary = self.listing.with(Listing::summary);
+        match self.arrangement_summary() {
+            arranged if arranged.is_empty() => summary,
+            arranged if self.full.borrow().is_some() => arranged,
+            arranged => format!("{summary} · {arranged}"),
+        }
     }
 
     pub(super) fn listing_empty(&self) -> Option<&'static str> {
@@ -587,6 +566,44 @@ impl Jukebox {
     }
 }
 
+/// How to play `track` from `listing`: in its Spotify context when it has one,
+/// so that Spotify goes on with it, or as the list of tracks it shows.
+fn play_from(listing: &Listing, track: String, arranged: bool, catalog: &Catalog) -> Play {
+    let context = |uri: String| Play::Context {
+        uri,
+        track: track.clone(),
+    };
+    match &listing.source {
+        // Another order or a filter, and a playlist's episodes, which its context
+        // leaves out, play as they show.
+        _ if arranged => Play::Tracks {
+            uris: listing.uris.to_vec(),
+            track,
+        },
+        Source::Playlist(_) if listing.has_episodes() => Play::Tracks {
+            uris: listing.uris.to_vec(),
+            track,
+        },
+        Source::Liked => context(catalog.liked_uri()),
+        Source::Playlist(playlist) => context(playlist.uri.clone()),
+        Source::Album(album) | Source::Show(album) => context(album.uri.clone()),
+        Source::Artist(artist) => context(artist.uri.clone()),
+        // The station goes on with more tracks like its seed once these end.
+        Source::Radio(seed) => context(format!(
+            "spotify:station:track:{}",
+            seed.uri.rsplit(':').next().unwrap_or_default()
+        )),
+        Source::Search(_)
+        | Source::Library(_)
+        | Source::Recent
+        | Source::Queue
+        | Source::Episodes => Play::Tracks {
+            uris: listing.uris.to_vec(),
+            track,
+        },
+    }
+}
+
 async fn resolve(
     catalog: &Catalog,
     source: &Source,
@@ -597,7 +614,16 @@ async fn resolve(
     let context = match source {
         Source::Search(text) | Source::Library(text) if text.is_empty() => return Ok(Vec::new()),
         Source::Recent => return catalog.recent_tracks().await,
-        Source::Queue => return Ok(up_next),
+        // The account's own queue, wherever it plays; this computer's when Spotify
+        // does not say.
+        Source::Queue => {
+            return Ok(match catalog.up_next().await {
+                Ok(next) if !next.is_empty() => next,
+                _ => up_next,
+            });
+        }
+        Source::Episodes => return catalog.saved_episodes().await,
+        Source::Radio(track) => return catalog.radio(&track.uri).await,
         Source::Library(text) => {
             let tracks = liked_tracks(catalog, liked).await?;
             return Ok(matching_tracks(&tracks, text));

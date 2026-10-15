@@ -1,6 +1,7 @@
 mod artist;
 mod auth;
 mod catalog;
+mod connect;
 mod fade;
 mod model;
 #[cfg(target_os = "linux")]
@@ -11,6 +12,7 @@ mod writes;
 
 pub(crate) use auth::{Authorization, Token, forget, stored_refresh_token};
 pub(crate) use catalog::{Catalog, search_uri};
+pub(crate) use connect::{Device, LyricLine};
 pub(crate) use model::{
     Album, Artist, ArtistPage, LibraryEntry, LibraryItem, PageDetails, Playlist, PlaylistDetails,
     Repeat, SearchItem, SearchKind, SearchResults, Track,
@@ -18,7 +20,7 @@ pub(crate) use model::{
 pub(crate) use speaker::{
     Command, Connection, Events, Lost, Mode, Play, Speaker, check_output, output_names,
 };
-pub(crate) use writes::Resume;
+pub(crate) use writes::{Direction, Resume};
 
 #[derive(Debug, thiserror::Error)]
 pub(crate) enum Error {

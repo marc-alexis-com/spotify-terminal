@@ -124,7 +124,7 @@ fn words(text: &str) -> Vec<String> {
 }
 
 /// Lowercase without the accents of Latin letters, so that "beyonce" finds "Beyoncé".
-fn fold(text: &str) -> String {
+pub(super) fn fold(text: &str) -> String {
     text.to_lowercase()
         .chars()
         .map(|character| match character {

@@ -1,0 +1,13 @@
+<template rust:component="RenamePlaylist">
+  <section class="overlay">
+    <div class="dialog">
+      <div class="dialog-heading">
+        <h2 class="dialog-title">Rename the playlist</h2>
+        <button on:click="state.jukebox.close_rename()">Close  Esc</button>
+      </div>
+      <input id="rename-name" autofocus bind="state.jukebox.rename_text"
+             on:keydown="state.jukebox.rename_key(&event)">
+      <p class="dialog-hint">Enter renames it · Esc leaves it as it is</p>
+    </div>
+  </section>
+</template>

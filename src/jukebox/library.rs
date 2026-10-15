@@ -7,7 +7,7 @@ use std::{collections::HashSet, rc::Rc};
 
 /// Shelves above the playlists in `ui/shelves.html`: Search, Search your library,
 /// Liked Songs, Recently played.
-pub(super) const FIXED_SHELVES: usize = 5;
+pub(super) const FIXED_SHELVES: usize = 6;
 const INDENT: &str = "  ";
 
 /// One line of the sidebar's playlist section.

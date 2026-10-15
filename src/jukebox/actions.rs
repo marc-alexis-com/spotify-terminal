@@ -295,44 +295,11 @@ impl Jukebox {
 
     /// Up and down move between the playlists; Esc closes.
     pub(super) fn picker_list_key(&self, event: &Event) {
-        let EventPayload::Input(Input::Key { key, .. }) = event.payload else {
-            return;
-        };
-        let buttons = self.picks();
-        let Some(index) = buttons.iter().position(|button| *button == event.target) else {
-            return;
-        };
-        match key {
-            Key::Escape => self.close_picker(),
-            Key::Down | Key::Char('j') => {
-                if let Some(next) = buttons.get(index + 1) {
-                    next.request_focus();
-                }
-            }
-            Key::Up | Key::Char('k') => match index.checked_sub(1) {
-                Some(previous) => buttons[previous].request_focus(),
-                None => self.focus("picker-name"),
-            },
-            _ => return,
-        }
-        event.prevent_default();
-    }
-
-    fn picks(&self) -> Vec<hypercmd::Node> {
-        self.root
-            .borrow()
-            .as_ref()
-            .and_then(|root| root.find("picker-list"))
-            .map(|list| {
-                list.descendants()
-                    .filter(|node| node.tag() == "button")
-                    .collect()
-            })
-            .unwrap_or_default()
+        self.list_key(event, "picker-list", Self::close_picker);
     }
 
     fn focus_first_pick(&self) {
-        if let Some(first) = self.picks().first() {
+        if let Some(first) = self.buttons_of("picker-list").first() {
             first.request_focus();
         }
     }
