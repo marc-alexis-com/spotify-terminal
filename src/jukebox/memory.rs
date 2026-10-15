@@ -139,6 +139,21 @@ pub(super) fn remember_episodes(points: &HashMap<String, Resume>) -> io::Result<
     write_whole(&path, &serde_json::to_vec(&positions)?)
 }
 
+/// The dates of the likes taken back, from `unliked.json`, by URI.
+pub(super) fn recall_unliked() -> HashMap<String, u32> {
+    state_file("unliked.json")
+        .and_then(|path| std::fs::read_to_string(path).ok())
+        .and_then(|text| serde_json::from_str(&text).ok())
+        .unwrap_or_default()
+}
+
+/// Keeps the dates of the likes taken back, so that a like given again keeps its place.
+pub(super) fn remember_unliked(dates: &HashMap<String, u32>) -> io::Result<()> {
+    let path = state_file("unliked.json")
+        .ok_or_else(|| io::Error::other("no home folder to keep the dates in"))?;
+    write_whole(&path, &serde_json::to_vec(dates)?)
+}
+
 /// Writes a file whole or not at all: it goes to a file beside, then takes its name.
 fn write_whole(path: &Path, bytes: &[u8]) -> io::Result<()> {
     if let Some(dir) = path.parent() {

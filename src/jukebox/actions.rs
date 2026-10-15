@@ -29,10 +29,11 @@ impl Jukebox {
         let Some(catalog) = self.catalog() else {
             return;
         };
-        let saved = self.saved.clone();
+        let (saved, liked_at) = (self.saved.clone(), self.liked_at.clone());
         let started = self.spawn(async move {
-            let uris = catalog.context_tracks(catalog.liked_uri()).await?;
-            saved.set(uris.into_iter().collect());
+            let dates = catalog.liked_dates().await?;
+            saved.set(dates.keys().cloned().collect());
+            liked_at.replace(dates);
             Ok(())
         });
         if let Err(error) = started {
@@ -61,6 +62,8 @@ impl Jukebox {
     }
 
     /// Changes the heart at once, and puts it back if Spotify refuses.
+    /// A like taken back keeps its date, so that liking the track again puts it
+    /// back in its place in Liked Songs rather than at the top.
     fn toggle_like(self: &Rc<Self>, track: &Track) {
         let Some(catalog) = self.catalog() else {
             return;
@@ -74,12 +77,22 @@ impl Jukebox {
                 saved.remove(uri);
             }
         };
+        if !like && let Some(date) = self.liked_at.borrow().get(&uri).copied() {
+            // Kept before anything changes, so that no failure can lose it.
+            self.unliked.borrow_mut().insert(uri.clone(), date);
+            self.save_unliked();
+        }
+        let first_date = self.unliked.borrow().get(&uri).copied().filter(|_| like);
         self.saved.update(|saved| flip(saved, like, &uri));
         let jukebox = self.clone();
         let started = self.services.spawn(&self.owner, async move {
-            match catalog.set_saved(vec![uri.clone()], like).await {
-                Ok(()) if like => jukebox.inform(format!("Liked “{name}”.")),
-                Ok(()) => jukebox.inform(format!("Took back the like of “{name}”.")),
+            let done = if like {
+                catalog.save(uri.clone(), first_date).await
+            } else {
+                catalog.unsave(uri.clone()).await
+            };
+            match done {
+                Ok(()) => jukebox.liked_changed(&uri, &name, like, first_date),
                 Err(error) => {
                     jukebox.saved.update(|saved| flip(saved, !like, &uri));
                     jukebox.warn(error.to_string());
@@ -88,6 +101,40 @@ impl Jukebox {
         });
         if let Err(error) = started {
             self.warn(error.to_string());
+        }
+    }
+
+    /// Notes a like given or taken back, and says so.
+    fn liked_changed(&self, uri: &str, name: &str, like: bool, first_date: Option<u32>) {
+        if !like {
+            self.liked_at.borrow_mut().remove(uri);
+            self.inform(format!(
+                "Took back the like of “{name}”; liking it again puts it back in its place."
+            ));
+            return;
+        }
+        let date = first_date.unwrap_or_else(|| {
+            let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH);
+            now.map_or(0, |since| {
+                u32::try_from(since.as_secs()).unwrap_or(u32::MAX)
+            })
+        });
+        self.liked_at.borrow_mut().insert(uri.to_owned(), date);
+        if first_date.is_some() {
+            self.unliked.borrow_mut().remove(uri);
+            self.save_unliked();
+            self.inform(format!(
+                "Liked “{name}” again, back in its place of {}.",
+                day(date)
+            ));
+        } else {
+            self.inform(format!("Liked “{name}”."));
+        }
+    }
+
+    fn save_unliked(&self) {
+        if let Err(error) = memory::remember_unliked(&self.unliked.borrow()) {
+            self.warn(format!("Cannot keep the date of this like: {error}"));
         }
     }
 
@@ -375,5 +422,34 @@ fn mark(point: &Resume) -> Option<&'static str> {
         Some("◐")
     } else {
         None
+    }
+}
+
+/// The day of a date in seconds since 1970, as `2022-06-09`.
+fn day(seconds: u32) -> String {
+    // Howard Hinnant's days-to-civil, for the proleptic Gregorian calendar.
+    let days = i64::from(seconds) / 86_400 + 719_468;
+    let era = days.div_euclid(146_097);
+    let of_era = days.rem_euclid(146_097);
+    let year_of_era = (of_era - of_era / 1460 + of_era / 36_524 - of_era / 146_096) / 365;
+    let of_year = of_era - (365 * year_of_era + year_of_era / 4 - year_of_era / 100);
+    let month_index = (5 * of_year + 2) / 153;
+    let day = of_year - (153 * month_index + 2) / 5 + 1;
+    let month = if month_index < 10 {
+        month_index + 3
+    } else {
+        month_index - 9
+    };
+    let year = year_of_era + era * 400 + i64::from(month <= 2);
+    format!("{year}-{month:02}-{day:02}")
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn dates_read_as_days() {
+        assert_eq!(super::day(1_654_795_474), "2022-06-09");
+        assert_eq!(super::day(0), "1970-01-01");
+        assert_eq!(super::day(951_782_400), "2000-02-29");
     }
 }

@@ -113,6 +113,10 @@ pub(crate) struct Jukebox {
     root: RefCell<Option<Node>>,
     /// The tracks in Liked Songs, for their hearts.
     saved: Signal<HashSet<String>>,
+    /// When each track of Liked Songs was liked, which sets its place there.
+    liked_at: Rc<RefCell<HashMap<String, u32>>>,
+    /// The dates of the likes taken back, given again with the like.
+    unliked: RefCell<HashMap<String, u32>>,
     /// Where podcast episodes were left, here or on another device.
     resume: Signal<HashMap<String, spotify::Resume>>,
     /// The tracks queued here that have not played yet, in order.
@@ -183,6 +187,8 @@ impl FromInputs for Jukebox {
             notice: signal(None),
             root: RefCell::new(None),
             saved: signal(HashSet::new()),
+            liked_at: Rc::default(),
+            unliked: RefCell::new(memory::recall_unliked()),
             resume: signal(memory::recall_episodes()),
             queue: RefCell::new(Vec::new()),
             playing_list: RefCell::new(Vec::new()),
