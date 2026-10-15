@@ -231,13 +231,14 @@ impl Catalog {
         .await
     }
 
-    /// Creates a playlist, puts it first in the library and returns its URI.
+    /// Creates a playlist, puts it first in the library and returns its URI. The
+    /// name sent with the creation is not kept by Spotify, so it is set after.
     pub(crate) async fn create_playlist(&self, name: String) -> Result<String, Error> {
         let session = self.session.clone();
-        run(async move {
+        let uri = run(async move {
             let request = ListUpdateRequest {
                 attributes: MessageField::some(ListAttributes {
-                    name: Some(name),
+                    name: Some(name.clone()),
                     ..ListAttributes::default()
                 }),
                 ..ListUpdateRequest::default()
@@ -259,9 +260,12 @@ impl Catalog {
                     &changes(revision, add(vec![uri.clone()], true)),
                 )
                 .await?;
-            Ok(uri)
+            Ok::<_, Error>((uri, name))
         })
-        .await
+        .await?;
+        let (uri, name) = uri;
+        self.rename_playlist(&uri, name).await?;
+        Ok(uri)
     }
 }
 
