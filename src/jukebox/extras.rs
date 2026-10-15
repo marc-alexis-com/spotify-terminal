@@ -259,7 +259,7 @@ impl Jukebox {
             label.push_str(" (this computer)");
         }
         if device.active {
-            label = format!("♫ {label} · playing");
+            label = format!("♫ {label} · active");
         }
         format!("{label}  {}", device.kind)
     }
@@ -276,7 +276,7 @@ impl Jukebox {
         };
         self.close_devices();
         if device.active {
-            self.inform(format!("Music already plays on {}.", device.name));
+            self.inform(format!("{} is already the device in use.", device.name));
             return;
         }
         let (jukebox, id, name) = (self.clone(), device.id.clone(), device.name.clone());

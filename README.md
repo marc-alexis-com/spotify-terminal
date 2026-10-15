@@ -59,8 +59,14 @@ all come from one settings file.
 </p>
 
 <p align="center">
-  <img src="docs/images/playing-help.png" alt="the keys, as ? shows them" width="85%">
-  <br><sub><code>?</code> lists the keys, as the settings set them.</sub>
+  <img src="docs/images/sort-filter.png" alt="an album filtered on “on” and sorted by length, under its header" width="49%">
+  <img src="docs/images/devices.png" alt="the devices of the account, to move the music to one" width="49%">
+  <br><sub>A list filtered as you type and sorted by length, under an album's header; the devices the music can move to.</sub>
+</p>
+
+<p align="center">
+  <img src="docs/images/keys.png" alt="every key, as ? shows them" width="85%">
+  <br><sub><code>?</code> lists every key, as the settings set them.</sub>
 </p>
 
 ## Install
