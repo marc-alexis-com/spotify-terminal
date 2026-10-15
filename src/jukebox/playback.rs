@@ -162,6 +162,20 @@ impl Jukebox {
             }
             self.clock.update(|clock| *clock += 1);
             self.remember_view();
+            let episode = self.now.with_untracked(|now| {
+                let length = now
+                    .track
+                    .as_ref()
+                    .map(|track| Duration::from_millis(track.duration_ms));
+                now.uri
+                    .clone()
+                    .filter(|_| now.playing)
+                    .zip(length)
+                    .map(|(uri, length)| (uri, now.elapsed(), length))
+            });
+            if let Some((uri, elapsed, length)) = episode {
+                self.remember_episode(&uri, elapsed, length);
+            }
         }
     }
 
@@ -291,24 +305,28 @@ impl Jukebox {
 
     fn change_track(self: &Rc<Self>, uri: String, cover: Option<String>, fallback: Track) {
         let known = self.now.update(|now| now.start(&uri));
-        self.change_cover(&uri, cover);
+        self.change_cover(&uri, cover.clone());
         if known {
             return;
         }
+        self.dequeue(&uri);
+        self.refresh_queue();
         let Some(catalog) = self.catalog() else {
             self.now.update(|now| now.describe(&uri, fallback));
             return;
         };
-        let now = self.now.clone();
+        let (now, http) = (self.now.clone(), self.http.clone());
         let started = self.spawn(async move {
             // A failed or empty answer would otherwise leave "Loading…" for the whole track.
             let found = catalog.tracks(vec![uri.clone()]).await;
             let track = found
                 .as_ref()
                 .ok()
-                .and_then(|tracks| tracks.first().cloned());
-            now.update(|now| now.describe(&uri, track.unwrap_or(fallback)));
-            found.map(drop)
+                .and_then(|tracks| tracks.first().cloned())
+                .unwrap_or(fallback);
+            let notified = crate::notify::track_started(http, &track, cover).await;
+            now.update(|now| now.describe(&uri, track));
+            found.map(drop).and(notified)
         });
         if let Err(error) = started {
             self.warn(error.to_string());
@@ -439,6 +457,11 @@ impl Jukebox {
         })
     }
 
+    /// The playing track, once its details are known.
+    pub(super) fn playing_track(&self) -> Option<Rc<Track>> {
+        self.now.with_untracked(|now| now.track.clone())
+    }
+
     pub(super) fn playing_uri(&self) -> Option<String> {
         self.now.with(NowPlaying::listed_uri)
     }
@@ -464,7 +487,9 @@ impl Jukebox {
     }
 
     pub(super) fn track_title(&self) -> String {
+        let hearts = config::get().interface.show_likes;
         self.now.with(|now| match (&now.track, &now.uri) {
+            (Some(track), _) if hearts && self.is_saved(&track.uri) => format!("♥ {}", track.name),
             (Some(track), _) => track.name.clone(),
             (None, Some(_)) => "Loading…".into(),
             (None, None) => "Nothing playing".into(),

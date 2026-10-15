@@ -12,6 +12,8 @@ pub(crate) enum Source {
     Library(String),
     Liked,
     Recent,
+    /// What plays after the current track: the queue, then the rest of the list.
+    Queue,
     Playlist(Rc<Playlist>),
     Album(Rc<Album>),
     Artist(Rc<Artist>),
@@ -147,6 +149,7 @@ impl Source {
             Self::Library(text) => format!("Your library · “{text}”"),
             Self::Liked => "Liked Songs".into(),
             Self::Recent => "Recently played".into(),
+            Self::Queue => "Up next".into(),
             Self::Playlist(playlist) => playlist.name.clone(),
             Self::Album(album) => format!("Album · {}", album.name),
             Self::Artist(artist) => format!("Artist · {}", artist.name),
@@ -164,6 +167,7 @@ impl Source {
             Self::Library(_) => "Nothing in your Liked Songs matched. Try other words.",
             Self::Liked => "Songs you like in Spotify appear here.",
             Self::Recent => "Nothing played recently.",
+            Self::Queue => "Nothing comes next. Play a list, or queue a track.",
             Self::Playlist(_) | Self::Album(_) | Self::Artist(_) | Self::Show(_) => {
                 "No playable tracks here."
             }

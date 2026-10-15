@@ -25,8 +25,14 @@ all come from one settings file.
 | Area | What you get |
 |---|---|
 | **Library** | Liked Songs, playlists in their folders, recently played, and a search of your own library |
+| **Likes** | a heart on every liked track; like or unlike the row or what plays, in one key |
+| **Playlists** | add the row to one of your playlists, or to a new one, from a picker that filters as you type |
+| **Queue** | add to it, and see what comes next: the tracks you queued, then the rest of the list |
 | **Catalog** | search as you type, with songs, artists, albums, playlists and podcasts |
 | **Artists** | picture, monthly listeners, popular tracks with their play counts, discography, related artists |
+| **Albums, podcasts** | a header with the cover, the makers, the year and the label |
+| **Podcasts** | the arrows seek 30 s, episodes start where you left them, ✓ and ◐ mark the played and begun ones |
+| **Notifications** | a desktop notification with the cover when a track starts (Linux) |
 | **Playback** | 320 kbit/s, normalised loudness, gapless, seek (30 s in podcasts), volume, shuffle, repeat, queue |
 | **Covers** | album and artist pictures in kitty, through tmux too, with Unicode placeholders |
 | **Spotify Connect** | other Spotify apps see this computer and can drive it |
@@ -106,6 +112,9 @@ app or client ID is needed.
 | `Enter` | play the selected track |
 | `o` / `a` | open the track's album / artist |
 | `z` | add the track to the queue |
+| `u` | show what comes next |
+| `H` / `*` | like the row / what plays, or take the like back |
+| `t` | add the row to a playlist |
 | `/`, `Ctrl+F` / `f` | search the catalog / your library |
 | `Tab`, `h` `l` | sidebar, list and search boxes |
 | `b` | show or hide the sidebar |
@@ -152,6 +161,7 @@ volume_seconds = 2      # how long the volume bar shows after a change
 fps = 60                # of the progress bar while music plays
 pause_fade = true       # the player's border fades to gray on pause
 bar_glyph = "━"
+show_likes = true       # a heart before the liked tracks
 
 [playback]
 bitrate = 320           # 96, 160 or 320 kbit/s
@@ -195,10 +205,23 @@ queue = ["z"]
 search = ["/"]
 library_search = ["f"]
 toggle_sidebar = ["b"]
+like = ["H"]            # the selected row
+like_playing = ["*"]
+show_queue = ["u"]
+add_to_playlist = ["t"]
 help = ["?"]
 quit = ["q"]
 back = ["escape", "backspace"]
 gg_delay_ms = 800       # j, k, h, l, g, G, Enter, Tab and the arrows up and down stay
+
+[notifications]         # when a track starts, on Linux
+enabled = true
+timeout_ms = 5000       # 0 leaves it to the notification daemon
+covers = true
+
+[podcasts]
+resume = true           # an episode starts where it was left on this computer
+mark_played = true      # ✓ played, ◐ begun
 
 [system]
 mpris = true            # media keys and playerctl, on Linux
@@ -210,8 +233,13 @@ browser = "xdg-open"    # opens the login page; "open" on macOS
 audio outputs `output` can name. `spt` refuses to start on a mistake in the file
 and names the line.
 
-The view and the row you left are kept in `~/.local/state/spt/view.json`, the
-device ID beside them, and played tracks in `~/.cache/spt/audio`.
+The view and the row you left are kept in `~/.local/state/spt/view.json`, where
+episodes were left in `episodes.json` beside it, with the device ID; played tracks
+in `~/.cache/spt/audio`, and the covers of notifications in `~/.cache/spt/covers`.
+
+Spotify lets this client change the library but not read the account's queue nor
+its podcast resume points: `spt` keeps those itself, so the queue view shows what
+was queued here, and episodes resume where this computer left them.
 
 **Home Manager.** The file is plain TOML, so `xdg.configFile` writes it:
 

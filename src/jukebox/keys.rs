@@ -53,6 +53,14 @@ impl Jukebox {
         if self.screen.get_untracked() != Screen::Library {
             return Ok(());
         }
+        // The picker's own keys handle it while it is open; Esc closes it from anywhere.
+        if self.picker.with_untracked(Option::is_some) {
+            if key == Key::Escape {
+                self.close_picker();
+                event.prevent_default();
+            }
+            return Ok(());
+        }
         if self.help.get_untracked() {
             if key == Key::Escape {
                 self.close_help();
@@ -95,6 +103,10 @@ impl Jukebox {
             Action::Search => self.start_search(),
             Action::LibrarySearch => self.start_library_search(),
             Action::ToggleSidebar => self.toggle_sidebar(),
+            Action::Like => self.like_selected(),
+            Action::LikePlaying => self.like_playing(),
+            Action::ShowQueue => self.show_queue(),
+            Action::AddToPlaylist => self.pick_playlist(),
             Action::Help => self.open_help(),
             Action::Quit => quit()?,
             Action::Back => return Ok(self.back()),

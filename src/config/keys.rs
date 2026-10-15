@@ -20,6 +20,10 @@ pub(crate) enum Action {
     Search,
     LibrarySearch,
     ToggleSidebar,
+    Like,
+    LikePlaying,
+    ShowQueue,
+    AddToPlaylist,
     Help,
     Quit,
     Back,
@@ -57,6 +61,10 @@ pub(crate) struct Keys {
     search: Vec<String>,
     library_search: Vec<String>,
     toggle_sidebar: Vec<String>,
+    like: Vec<String>,
+    like_playing: Vec<String>,
+    show_queue: Vec<String>,
+    add_to_playlist: Vec<String>,
     help: Vec<String>,
     quit: Vec<String>,
     back: Vec<String>,
@@ -86,6 +94,10 @@ impl Default for Keys {
             search: keys(&["/"]),
             library_search: keys(&["f"]),
             toggle_sidebar: keys(&["b"]),
+            like: keys(&["H"]),
+            like_playing: keys(&["*"]),
+            show_queue: keys(&["u"]),
+            add_to_playlist: keys(&["t"]),
             help: keys(&["?"]),
             quit: keys(&["q"]),
             back: keys(&["escape", "backspace"]),
@@ -96,7 +108,7 @@ impl Default for Keys {
 
 impl Keys {
     /// Every action with its keys as written, in the order the help lists them.
-    pub(crate) fn bindings(&self) -> [(Action, &[String], &'static str); 18] {
+    pub(crate) fn bindings(&self) -> [(Action, &[String], &'static str); 22] {
         [
             (Action::PlayPause, &self.play_pause, "play or pause"),
             (Action::Next, &self.next, "next track"),
@@ -124,6 +136,18 @@ impl Keys {
                 Action::ToggleSidebar,
                 &self.toggle_sidebar,
                 "show or hide the sidebar",
+            ),
+            (Action::Like, &self.like, "like the row, or not"),
+            (
+                Action::LikePlaying,
+                &self.like_playing,
+                "like what plays, or not",
+            ),
+            (Action::ShowQueue, &self.show_queue, "show the queue"),
+            (
+                Action::AddToPlaylist,
+                &self.add_to_playlist,
+                "add the row to a playlist",
             ),
             (Action::Help, &self.help, "these keys"),
             (Action::Quit, &self.quit, "quit"),

@@ -41,6 +41,17 @@ pub(crate) struct PlaylistDetails {
     pub(crate) cover: Option<String>,
 }
 
+/// What the header of an album or a podcast shows.
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct PageDetails {
+    pub(crate) uri: String,
+    pub(crate) kind: String,
+    pub(crate) name: String,
+    pub(crate) detail: String,
+    pub(crate) byline: String,
+    pub(crate) cover: Option<String>,
+}
+
 /// An artist's page: who they are, how many listen, and what they released.
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct ArtistPage {

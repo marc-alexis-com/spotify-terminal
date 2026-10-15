@@ -113,6 +113,11 @@ const PAINTED: &[Painted] = &[
     (&[Class("dialog")], &[(Border, Role::Accent)]),
     (&[Class("dialog-hint")], &[(Fg, Role::Subtext)]),
     (&[Class("keys")], &[(Fg, Role::Text)]),
+    (&[Class("pick")], &[(Fg, Role::Subtext)]),
+    (
+        &[Class("pick"), Focus],
+        &[(Fg, Role::Text), (Bg, Role::Surface)],
+    ),
 ];
 
 /// The player's border, from the accent to gray in eighths as music pauses: see `run_frames`.

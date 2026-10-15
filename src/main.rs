@@ -2,6 +2,7 @@ mod config;
 mod cover;
 mod icons;
 mod jukebox;
+mod notify;
 mod spotify;
 mod theme;
 

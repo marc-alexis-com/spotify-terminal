@@ -22,6 +22,8 @@ pub(crate) struct Config {
     pub(crate) cache: Cache,
     pub(crate) search: Search,
     pub(crate) keys: Keys,
+    pub(crate) notifications: Notifications,
+    pub(crate) podcasts: Podcasts,
     pub(crate) system: System,
 }
 
@@ -156,6 +158,10 @@ impl TryFrom<String> for Paint {
 
 #[derive(Deserialize)]
 #[serde(default, deny_unknown_fields)]
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "independent settings, each a switch of the settings file"
+)]
 pub(crate) struct Interface {
     pub(crate) start: Start,
     /// Whether the selected row comes back with the view at the next start.
@@ -172,6 +178,8 @@ pub(crate) struct Interface {
     pub(crate) pause_fade: bool,
     /// The character the progress and volume bars are drawn with.
     pub(crate) bar_glyph: char,
+    /// A heart before the liked tracks, in the lists and the player.
+    pub(crate) show_likes: bool,
 }
 
 impl Default for Interface {
@@ -186,6 +194,7 @@ impl Default for Interface {
             fps: 60,
             pause_fade: true,
             bar_glyph: '━',
+            show_likes: true,
         }
     }
 }
@@ -332,6 +341,45 @@ impl SearchBox {
             Self::Albums => "Albums",
             Self::Playlists => "Playlists",
             Self::Podcasts => "Podcasts",
+        }
+    }
+}
+
+/// A desktop notification when a track starts, on Linux.
+#[derive(Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub(crate) struct Notifications {
+    pub(crate) enabled: bool,
+    /// How long it stays; 0 leaves it to the notification daemon.
+    pub(crate) timeout_ms: u32,
+    /// The album cover as its icon.
+    pub(crate) covers: bool,
+}
+
+impl Default for Notifications {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            timeout_ms: 5000,
+            covers: true,
+        }
+    }
+}
+
+#[derive(Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub(crate) struct Podcasts {
+    /// Starts an episode where it was left, here or on another device.
+    pub(crate) resume: bool,
+    /// Marks the episodes played (✓) and begun (◐) in the lists.
+    pub(crate) mark_played: bool,
+}
+
+impl Default for Podcasts {
+    fn default() -> Self {
+        Self {
+            resume: true,
+            mark_played: true,
         }
     }
 }

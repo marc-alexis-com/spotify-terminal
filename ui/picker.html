@@ -1,0 +1,21 @@
+<template rust:component="PlaylistPicker">
+  <section class="overlay">
+    <div class="dialog picker">
+      <div class="dialog-heading">
+        <h2 class="dialog-title">{{ state.jukebox.picker_title() }}</h2>
+        <button on:click="state.jukebox.close_picker()">Close  Esc</button>
+      </div>
+      <input id="picker-name" autofocus bind="state.jukebox.picker_text"
+             class:placeholder="{{ state.jukebox.picker_text.with(String::is_empty) }}"
+             placeholder="Playlist name…"
+             on:keydown="state.jukebox.picker_key(&event)">
+      <div id="picker-list" class="picker-list">
+        <ForEach items="{{ state.jukebox.picker_playlists() }}" key="{{ |playlist| playlist.uri.clone() }}" item="playlist">
+          <button class="pick" on:click="state.jukebox.add_to(&playlist.get())"
+                  on:keydown="state.jukebox.picker_list_key(&event)">{{ playlist.get().name.clone() }}</button>
+        </ForEach>
+      </div>
+      <p class="dialog-hint">{{ state.jukebox.picker_hint() }}</p>
+    </div>
+  </section>
+</template>

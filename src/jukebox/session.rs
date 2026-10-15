@@ -100,6 +100,7 @@ impl Jukebox {
             self.warn(format!("Cannot watch the connection to Spotify: {error}"));
         }
         self.load_playlists();
+        self.load_saved();
         self.open_first_view();
         self.focus("tracks");
         Ok(())

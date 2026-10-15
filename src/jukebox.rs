@@ -1,3 +1,4 @@
+mod actions;
 mod artist;
 mod browse;
 mod header;
@@ -110,6 +111,20 @@ pub(crate) struct Jukebox {
     shelves_focused: Signal<bool>,
     notice: Signal<Option<Notice>>,
     root: RefCell<Option<Node>>,
+    /// The tracks in Liked Songs, for their hearts.
+    saved: Signal<HashSet<String>>,
+    /// Where podcast episodes were left, here or on another device.
+    resume: Signal<HashMap<String, spotify::Resume>>,
+    /// The tracks queued here that have not played yet, in order.
+    queue: RefCell<Vec<String>>,
+    /// The list the playing track was started from, for what comes next.
+    playing_list: RefCell<Vec<String>>,
+    /// The last track of that list to play, which the list goes on from.
+    list_position: RefCell<Option<String>>,
+    /// The playlist picker, while it is open.
+    picker: Signal<Option<Rc<actions::Picker>>>,
+    /// What the picker's field holds.
+    picker_text: Signal<String>,
     /// The row to select once the list opened at start is known.
     pending_row: Cell<Option<usize>>,
     /// The view and row saved last, written again only once they change.
@@ -167,6 +182,13 @@ impl FromInputs for Jukebox {
             shelves_focused: signal(false),
             notice: signal(None),
             root: RefCell::new(None),
+            saved: signal(HashSet::new()),
+            resume: signal(memory::recall_episodes()),
+            queue: RefCell::new(Vec::new()),
+            playing_list: RefCell::new(Vec::new()),
+            list_position: RefCell::new(None),
+            picker: signal(None),
+            picker_text: signal(String::new()),
             pending_row: Cell::new(None),
             remembered: RefCell::new(None),
             sidebar: signal(config::get().layout.sidebar),

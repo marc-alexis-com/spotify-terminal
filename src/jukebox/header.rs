@@ -1,4 +1,5 @@
-//! The header above the tracks of a playlist or an artist: picture, name and details.
+//! The header above the tracks of a playlist, an artist, an album or a podcast:
+//! picture, name and details.
 use super::{
     Jukebox,
     artist::{ArtistCache, artist_page},
@@ -7,7 +8,7 @@ use super::{
 };
 use crate::{
     cover::{self, Picture, Slot},
-    spotify::{self, ArtistPage, Catalog, PlaylistDetails},
+    spotify::{self, ArtistPage, Catalog, PageDetails, PlaylistDetails},
 };
 use std::{rc::Rc, time::Duration};
 
@@ -16,6 +17,7 @@ const HEADER_WAIT: Duration = Duration::from_millis(600);
 /// How long the sidebar rests on a playlist before its header loads ahead of Enter.
 const PREFETCH_DELAY: Duration = Duration::from_millis(150);
 const ARTIST_PREFIX: &str = "spotify:artist:";
+const PLAYLIST_PREFIX: &str = "spotify:playlist:";
 
 /// What the header shows: the picture, a kind, the name and two lines of details.
 #[derive(Clone, Debug, PartialEq)]
@@ -45,6 +47,18 @@ impl HeaderInfo {
             name: details.name,
             detail: details.description,
             byline: details.owner,
+            counts: true,
+            cover: details.cover,
+        }
+    }
+
+    fn page(details: PageDetails) -> Self {
+        Self {
+            uri: details.uri,
+            kind: details.kind,
+            name: details.name,
+            detail: details.detail,
+            byline: details.byline,
             counts: true,
             cover: details.cover,
         }
@@ -282,6 +296,7 @@ fn page_uri(source: &Source) -> Option<String> {
     match source {
         Source::Playlist(playlist) => Some(playlist.uri.clone()),
         Source::Artist(artist) => Some(artist.uri.clone()),
+        Source::Album(album) | Source::Show(album) => Some(album.uri.clone()),
         _ => None,
     }
 }
@@ -296,8 +311,10 @@ async fn header(
     let info = if uri.starts_with(ARTIST_PREFIX) {
         let page = artist_page(&catalog, &artists, uri).await?;
         HeaderInfo::artist(&page)
-    } else {
+    } else if uri.starts_with(PLAYLIST_PREFIX) {
         HeaderInfo::playlist(catalog.playlist_details(uri).await?)
+    } else {
+        HeaderInfo::page(catalog.page_details(uri).await?)
     };
     let pixels = match info.cover.clone().filter(|_| cover::supported()) {
         Some(url) => cover::fetch(http, url, Slot::Header)

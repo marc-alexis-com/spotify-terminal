@@ -26,6 +26,7 @@ jukebox_views! {
     PlayerBar => "ui/player-bar.html",
     Help => "ui/help.html",
     SearchResults => "ui/results.html",
+    PlaylistPicker => "ui/picker.html",
 }
 
 fusor::template!(backend = "hypercmd", "ui/app.html");

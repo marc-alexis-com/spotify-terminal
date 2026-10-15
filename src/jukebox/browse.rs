@@ -1,5 +1,5 @@
 use super::{
-    Jukebox, Tone,
+    Jukebox,
     keys::Jump,
     listing::{Listing, Loading, Row, Source},
     memory,
@@ -118,6 +118,7 @@ impl Jukebox {
         match &source {
             Source::Playlist(playlist) => self.load_header(&playlist.uri),
             Source::Artist(artist) => self.load_header(&artist.uri),
+            Source::Album(album) | Source::Show(album) => self.load_header(&album.uri),
             Source::Search(text) if !text.is_empty() => self.load_results(text),
             _ => {}
         }
@@ -125,8 +126,8 @@ impl Jukebox {
         let generation = self.next_generation();
         self.listing.set(Listing::new(source.clone()));
         self.window.update(|window| window.select(0, 0));
-        let (liked, artists) = (self.liked.clone(), self.artists.clone());
-        let task = async move { resolve(&catalog, &source, &liked, &artists).await };
+        let (liked, artists, next) = (self.liked.clone(), self.artists.clone(), self.up_next());
+        let task = async move { resolve(&catalog, &source, &liked, &artists, next).await };
         self.load(generation, task, |jukebox, uris| {
             let length = uris.len();
             jukebox.listing.update(|listing| listing.uris = uris.into());
@@ -157,8 +158,9 @@ impl Jukebox {
         let generation = self.next_generation();
         let task = async move { catalog.tracks(chunk).await };
         self.load(generation, task, |jukebox, tracks| {
+            let tracks: Vec<Rc<_>> = tracks.into_iter().map(Rc::new).collect();
             let length = jukebox.listing.update(|listing| {
-                listing.add_chunk(tracks.into_iter().map(Rc::new));
+                listing.add_chunk(tracks);
                 listing.tracks.len()
             });
             if jukebox.to_end.get() {
@@ -380,7 +382,7 @@ impl Jukebox {
         }
     }
 
-    fn selected(&self) -> Option<Rc<crate::spotify::Track>> {
+    pub(super) fn selected(&self) -> Option<Rc<crate::spotify::Track>> {
         let index = self.window.with_untracked(|window| window.selected);
         self.listing
             .with_untracked(|listing| listing.tracks.get(index).cloned())
@@ -425,14 +427,20 @@ impl Jukebox {
                     uri: show.uri.clone(),
                     track,
                 },
-                Source::Search(_) | Source::Library(_) | Source::Recent => Play::Tracks {
-                    uris: listing.uris.to_vec(),
-                    track,
-                },
+                Source::Search(_) | Source::Library(_) | Source::Recent | Source::Queue => {
+                    Play::Tracks {
+                        uris: listing.uris.to_vec(),
+                        track,
+                    }
+                }
             }
         });
+        self.playing_list
+            .replace(self.listing.with_untracked(|listing| listing.uris.to_vec()));
         let mode = self.mode();
-        self.with_speaker(|speaker| speaker.play(play, mode));
+        // An episode starts where it was left, if the settings say so.
+        let start = self.resume_position(&track.uri);
+        self.with_speaker(|speaker| speaker.play(play, mode, start));
         Ok(())
     }
 
@@ -462,7 +470,7 @@ impl Jukebox {
         }
     }
 
-    pub(super) fn queue_selected(&self) -> Result<(), Error> {
+    pub(super) fn queue_selected(self: &Rc<Self>) -> Result<(), Error> {
         let Some(track) = self.selected() else {
             self.inform("Select a track to add it to the queue.");
             return Ok(());
@@ -479,11 +487,11 @@ impl Jukebox {
         else {
             return Ok(());
         };
-        let (notice, clock) = (self.notice.clone(), self.clock.clone());
+        let jukebox = self.clone();
         self.spawn(async move {
             queued.await?;
-            let text = format!("Added “{}” to the queue.", track.name);
-            super::notify(&notice, &clock, text, Tone::Info);
+            jukebox.inform(format!("Added “{}” to the queue.", track.name));
+            jukebox.queued(track.uri.clone());
             Ok(())
         })
     }
@@ -501,6 +509,15 @@ impl Jukebox {
         if let Some(plays) = self.listed_artist().and_then(|uri| self.plays(&uri)) {
             for row in &mut rows {
                 row.artist = plays.get(&row.uri).cloned().unwrap_or_default();
+            }
+        }
+        let hearts = config::get().interface.show_likes;
+        for row in &mut rows {
+            if hearts && self.is_saved(&row.uri) {
+                row.title = format!("♥ {}", row.title);
+            }
+            if let Some(mark) = self.episode_mark(&row.uri).filter(|_| !row.playing) {
+                row.marker = mark.into();
             }
         }
         rows
@@ -575,10 +592,12 @@ async fn resolve(
     source: &Source,
     liked: &LikedCache,
     artists: &ArtistCache,
+    up_next: Vec<String>,
 ) -> Result<Vec<String>, spotify::Error> {
     let context = match source {
         Source::Search(text) | Source::Library(text) if text.is_empty() => return Ok(Vec::new()),
         Source::Recent => return catalog.recent_tracks().await,
+        Source::Queue => return Ok(up_next),
         Source::Library(text) => {
             let tracks = liked_tracks(catalog, liked).await?;
             return Ok(matching_tracks(&tracks, text));

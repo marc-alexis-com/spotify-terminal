@@ -80,16 +80,17 @@ impl Speaker {
         tokio::spawn(start(access_token, events, volume)).await?
     }
 
-    pub(crate) fn play(&self, play: Play, mode: Mode) -> Result<(), Error> {
+    /// Plays `play` from `start_ms` into its first track.
+    pub(crate) fn play(&self, play: Play, mode: Mode, start_ms: u32) -> Result<(), Error> {
         let options = |track| LoadRequestOptions {
             start_playing: true,
+            seek_to: start_ms,
             playing_track: Some(PlayingTrack::Uri(track)),
             context_options: Some(LoadContextOptions::Options(Options {
                 shuffle: mode.shuffle,
                 repeat: mode.repeat != Repeat::Off,
                 repeat_track: mode.repeat == Repeat::Track,
             })),
-            ..LoadRequestOptions::default()
         };
         let request = match play {
             Play::Context { uri, track } => LoadRequest::from_context_uri(uri, options(track)),

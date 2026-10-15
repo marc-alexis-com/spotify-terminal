@@ -60,13 +60,14 @@ input { width: 100%; height: 3ch; border-style: rounded; padding: 0 1ch; }
 .tracks-main { flex-grow: 1; flex-shrink: 1; min-width: 0; min-height: 0; }
 /* Starts below the column headings, beside the rows. */
 .scrollbar { width: 1ch; flex-shrink: 0; padding: 1ch 0 0 0; }
-tr { height: 1ch; }
+/* A gap, not a padding: a clipped text runs into its own padding, never into the gap. */
+tr { height: 1ch; column-gap: 1ch; }
 th { font-weight: normal; }
-th, td { padding: 0 1ch 0 0; white-space: pre; overflow: hidden; }
-.number { width: 5ch; flex-shrink: 0; }
+th, td { white-space: pre; overflow: hidden; }
+.number { width: 4ch; flex-shrink: 0; }
 .title { width: 0; flex-grow: 3; flex-shrink: 1; min-width: 0; }
 .artist, .album { width: 0; flex-grow: 2; flex-shrink: 1; min-width: 0; }
-.length { width: 8ch; flex-shrink: 0; }
+.length { width: 7ch; flex-shrink: 0; }
 .playing { font-weight: bold; }
 .empty { padding: 1ch; }
 .results { flex-direction: row; height: 10ch; flex-shrink: 0; gap: 1ch; }
@@ -135,3 +136,6 @@ th, td { padding: 0 1ch 0 0; white-space: pre; overflow: hidden; }
 .dialog-heading { flex-direction: row; height: 1ch; }
 .dialog-title { flex-grow: 1; }
 .keys { overflow: auto; }
+.picker-list { flex-grow: 1; flex-shrink: 1; min-height: 0; max-height: 16ch; overflow: auto; }
+.pick { height: 1ch; padding: 0 1ch; white-space: pre; overflow: hidden; }
+.pick:focus { text-decoration: none; }

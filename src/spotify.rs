@@ -7,16 +7,18 @@ mod model;
 mod mpris;
 mod search;
 mod speaker;
+mod writes;
 
 pub(crate) use auth::{Authorization, Token, forget, stored_refresh_token};
 pub(crate) use catalog::{Catalog, search_uri};
 pub(crate) use model::{
-    Album, Artist, ArtistPage, LibraryEntry, LibraryItem, Playlist, PlaylistDetails, Repeat,
-    SearchItem, SearchKind, SearchResults, Track,
+    Album, Artist, ArtistPage, LibraryEntry, LibraryItem, PageDetails, Playlist, PlaylistDetails,
+    Repeat, SearchItem, SearchKind, SearchResults, Track,
 };
 pub(crate) use speaker::{
     Command, Connection, Events, Lost, Mode, Play, Speaker, check_output, output_names,
 };
+pub(crate) use writes::Resume;
 
 #[derive(Debug, thiserror::Error)]
 pub(crate) enum Error {
@@ -40,6 +42,10 @@ pub(crate) enum Error {
     NoAudio,
     #[error("Audio output: {0}")]
     Output(String),
+    #[error("Spotify sent no {0}")]
+    Missing(String),
+    #[error("Desktop notification failed ({0}); notifications.enabled = false turns them off")]
+    Notify(String),
     #[error("Spotify did not send the artist's page ({0})")]
     Artist(String),
     #[error("Spotify search could not find artists, albums, playlists or podcasts ({0})")]

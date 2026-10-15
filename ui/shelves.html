@@ -11,6 +11,8 @@
             on:click="state.jukebox.open_shelf(Source::Liked)">{{ crate::icons::get().liked }}Liked Songs</button>
     <button class="shelf" on:focus="state.jukebox.shelves_focused.set(true)" on:blur="state.jukebox.shelves_focused.set(false)" class:current="{{ state.jukebox.is_current(&Source::Recent) }}"
             on:click="state.jukebox.open_shelf(Source::Recent)">{{ crate::icons::get().recent }}Recently played</button>
+    <button class="shelf" on:focus="state.jukebox.shelves_focused.set(true)" on:blur="state.jukebox.shelves_focused.set(false)" class:current="{{ state.jukebox.is_current(&Source::Queue) }}"
+            on:click="state.jukebox.open_shelf(Source::Queue)">{{ crate::icons::get().queue }}Up next</button>
     <p class="pane-title playlists-title">PLAYLISTS</p>
     <div id="playlists">
       <ForEach items="{{ state.jukebox.shelf_rows() }}" key="{{ |row| row.key.clone() }}">

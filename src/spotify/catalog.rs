@@ -1,4 +1,6 @@
-use super::{Album, Artist, Error, LibraryEntry, LibraryItem, Playlist, PlaylistDetails, Track};
+use super::{
+    Album, Artist, Error, LibraryEntry, LibraryItem, PageDetails, Playlist, PlaylistDetails, Track,
+};
 use http::Method;
 use librespot_core::{Session, SpotifyId, SpotifyUri};
 use librespot_protocol::{
@@ -24,6 +26,7 @@ const FOLDER_START: &str = "spotify:start-group:";
 const FOLDER_END: &str = "spotify:end-group:";
 const UNNAMED_FOLDER: &str = "Untitled folder";
 const SEARCH_PREFIX: &str = "spotify:search:";
+const SHOW_PREFIX: &str = "spotify:show:";
 const STATUS_OK: i32 = 200;
 const IMAGE_URL: &str = "https://i.scdn.co/image/";
 /// Spotify's own mosaic of four covers, for playlists without a picture.
@@ -149,6 +152,44 @@ impl Catalog {
                 description: plain_text(attributes.description()),
                 owner,
                 cover,
+            })
+        })
+        .await
+    }
+
+    /// The header of an album or a podcast: its kind, name, makers and cover.
+    pub(crate) async fn page_details(&self, uri: String) -> Result<PageDetails, Error> {
+        let session = self.session.clone();
+        run(async move {
+            let show = uri.starts_with(SHOW_PREFIX);
+            let kind = if show {
+                ExtensionKind::SHOW_V4
+            } else {
+                ExtensionKind::ALBUM_V4
+            };
+            let request = BatchedEntityRequest {
+                entity_request: vec![EntityRequest {
+                    entity_uri: uri.clone(),
+                    query: vec![ExtensionQuery {
+                        extension_kind: EnumOrUnknown::new(kind),
+                        ..ExtensionQuery::default()
+                    }],
+                    ..EntityRequest::default()
+                }],
+                ..BatchedEntityRequest::default()
+            };
+            let response = session.spclient().get_extended_metadata(request).await?;
+            let bytes = response
+                .extended_metadata
+                .iter()
+                .flat_map(|array| &array.extension_data)
+                .find(|data| data.header.status_code == STATUS_OK)
+                .map(|data| data.extension_data.value.clone())
+                .ok_or_else(|| Error::Missing("details for this page".into()))?;
+            Ok(if show {
+                show_details(uri, &metadata::Show::parse_from_bytes(&bytes)?)
+            } else {
+                album_details(uri, &metadata::Album::parse_from_bytes(&bytes)?)
             })
         })
         .await
@@ -418,6 +459,54 @@ fn cover_id(uri: &str, bytes: &[u8]) -> Option<String> {
         .find(|image| image.size() == metadata::image::Size::DEFAULT)
         .or(images.first())?;
     Some(hex(image.file_id()))
+}
+
+fn album_details(uri: String, album: &metadata::Album) -> PageDetails {
+    let artists = album
+        .artist
+        .iter()
+        .map(|artist| artist.name().to_owned())
+        .collect::<Vec<_>>()
+        .join(", ");
+    let year = album.date.year();
+    let made = [
+        (year > 0).then(|| year.to_string()),
+        Some(album.label().to_owned()).filter(|label| !label.is_empty()),
+    ];
+    let kind = match album.type_() {
+        metadata::album::Type::SINGLE => "SINGLE",
+        metadata::album::Type::EP => "EP",
+        metadata::album::Type::COMPILATION => "COMPILATION",
+        _ => "ALBUM",
+    };
+    PageDetails {
+        uri,
+        kind: kind.into(),
+        name: album.name().to_owned(),
+        detail: artists,
+        byline: made.into_iter().flatten().collect::<Vec<_>>().join(" · "),
+        cover: picture(&album.cover_group.image),
+    }
+}
+
+fn show_details(uri: String, show: &metadata::Show) -> PageDetails {
+    PageDetails {
+        uri,
+        kind: "PODCAST".into(),
+        name: show.name().to_owned(),
+        detail: plain_text(show.description()),
+        byline: show.publisher().to_owned(),
+        cover: picture(&show.cover_image.image),
+    }
+}
+
+/// The URL of the default size among `images`.
+fn picture(images: &[metadata::Image]) -> Option<String> {
+    let image = images
+        .iter()
+        .find(|image| image.size() == metadata::image::Size::DEFAULT)
+        .or(images.first())?;
+    Some(format!("{IMAGE_URL}{}", hex(image.file_id())))
 }
 
 fn hex(bytes: &[u8]) -> String {

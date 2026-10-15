@@ -2,9 +2,9 @@
 //! the next start. It lives in `$XDG_STATE_HOME/spt/view.json`: losing it only
 //! means opening Liked Songs.
 use super::listing::Source;
-use crate::spotify::{Album, Artist, Playlist};
+use crate::spotify::{Album, Artist, Playlist, Resume};
 use serde::{Deserialize, Serialize};
-use std::{io, path::PathBuf, rc::Rc};
+use std::{collections::HashMap, io, path::Path, path::PathBuf, rc::Rc};
 
 /// A view and the row selected in it.
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
@@ -33,6 +33,7 @@ impl Saved {
 enum View {
     Liked,
     Recent,
+    Queue,
     Search { text: String },
     Library { text: String },
     Playlist { uri: String, name: String },
@@ -46,6 +47,7 @@ impl From<&Source> for View {
         match source {
             Source::Liked => Self::Liked,
             Source::Recent => Self::Recent,
+            Source::Queue => Self::Queue,
             Source::Search(text) => Self::Search { text: text.clone() },
             Source::Library(text) => Self::Library { text: text.clone() },
             Source::Playlist(playlist) => Self::Playlist {
@@ -73,6 +75,7 @@ impl From<View> for Source {
         match view {
             View::Liked => Self::Liked,
             View::Recent => Self::Recent,
+            View::Queue => Self::Queue,
             View::Search { text } => Self::Search(text),
             View::Library { text } => Self::Library(text),
             View::Playlist { uri, name } => Self::Playlist(Rc::new(Playlist { uri, name })),
@@ -84,7 +87,66 @@ impl From<View> for Source {
 }
 
 fn path() -> Option<PathBuf> {
-    crate::config::xdg_dir("XDG_STATE_HOME", ".local/state").map(|dir| dir.join("view.json"))
+    state_file("view.json")
+}
+
+fn state_file(name: &str) -> Option<PathBuf> {
+    crate::config::xdg_dir("XDG_STATE_HOME", ".local/state").map(|dir| dir.join(name))
+}
+
+/// Where an episode was left on this computer.
+#[derive(Deserialize, Serialize)]
+struct Position {
+    position_ms: u64,
+    #[serde(default)]
+    played: bool,
+}
+
+/// Where the episodes were left on this computer, from `episodes.json`.
+pub(super) fn recall_episodes() -> HashMap<String, Resume> {
+    let Some(text) =
+        state_file("episodes.json").and_then(|path| std::fs::read_to_string(path).ok())
+    else {
+        return HashMap::new();
+    };
+    let positions: HashMap<String, Position> = serde_json::from_str(&text).unwrap_or_default();
+    positions
+        .into_iter()
+        .map(|(uri, position)| {
+            let point = Resume {
+                position_ms: position.position_ms,
+                fully_played: position.played,
+            };
+            (uri, point)
+        })
+        .collect()
+}
+
+/// Saves where the episodes were left.
+pub(super) fn remember_episodes(points: &HashMap<String, Resume>) -> io::Result<()> {
+    let positions: HashMap<&String, Position> = points
+        .iter()
+        .map(|(uri, point)| {
+            let position = Position {
+                position_ms: point.position_ms,
+                played: point.fully_played,
+            };
+            (uri, position)
+        })
+        .collect();
+    let path = state_file("episodes.json")
+        .ok_or_else(|| io::Error::other("no home folder to save the episodes in"))?;
+    write_whole(&path, &serde_json::to_vec(&positions)?)
+}
+
+/// Writes a file whole or not at all: it goes to a file beside, then takes its name.
+fn write_whole(path: &Path, bytes: &[u8]) -> io::Result<()> {
+    if let Some(dir) = path.parent() {
+        std::fs::create_dir_all(dir)?;
+    }
+    let partial = path.with_extension("partial");
+    std::fs::write(&partial, bytes)?;
+    std::fs::rename(partial, path)
 }
 
 /// The view saved last, if any could be read.
@@ -93,15 +155,10 @@ pub(super) fn recall() -> Option<Saved> {
     serde_json::from_str(&text).ok()
 }
 
-/// Saves the view, whole or not at all: it goes to a file beside, then takes its name.
+/// Saves the view.
 pub(super) fn remember(saved: &Saved) -> io::Result<()> {
     let path = path().ok_or_else(|| io::Error::other("no home folder to save the view in"))?;
-    if let Some(dir) = path.parent() {
-        std::fs::create_dir_all(dir)?;
-    }
-    let partial = path.with_extension("json.partial");
-    std::fs::write(&partial, serde_json::to_vec(saved)?)?;
-    std::fs::rename(partial, path)
+    write_whole(&path, &serde_json::to_vec(saved)?)
 }
 
 #[cfg(test)]
