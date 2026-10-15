@@ -411,6 +411,7 @@ impl Jukebox {
             .with_untracked(|listing| play_from(listing, track.uri.clone(), arranged, &catalog));
         self.playing_list
             .replace(self.listing.with_untracked(|listing| listing.uris.to_vec()));
+        self.last_play.replace(Some(play.clone()));
         let mode = self.mode();
         // An episode starts where it was left, if the settings say so.
         let start = self.resume_position(&track.uri);

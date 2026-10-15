@@ -44,6 +44,11 @@ struct ClusterDevice {
 struct PlayerState {
     #[serde(default)]
     next_tracks: Vec<NextTrack>,
+    context_uri: Option<String>,
+    #[serde(default)]
+    is_playing: bool,
+    #[serde(default)]
+    is_paused: bool,
 }
 
 #[derive(Deserialize)]
@@ -124,16 +129,32 @@ impl Catalog {
         Ok(devices)
     }
 
-    /// Moves the playback from the device playing to `to`, where it goes on.
-    pub(crate) async fn transfer(&self, to: String) -> Result<(), Error> {
-        let from = self
+    /// The context the account plays from, such as a playlist or Liked Songs.
+    pub(crate) async fn playing_context(&self) -> Result<Option<String>, Error> {
+        Ok(self
             .cluster()
             .await?
+            .player_state
+            .and_then(|state| state.context_uri)
+            .filter(|uri| !uri.is_empty()))
+    }
+
+    /// Moves the playback from the device in use to `to`, playing there if it
+    /// played here. Spotify is told so rather than left to read the device it
+    /// leaves: a librespot device it takes the music from has paused by then,
+    /// and the music arrived paused.
+    pub(crate) async fn transfer(&self, to: String) -> Result<(), Error> {
+        let cluster = self.cluster().await?;
+        let from = cluster
             .active_device_id
-            .ok_or_else(|| Error::Missing("device playing".into()))?;
+            .ok_or_else(|| Error::Missing("device in use".into()))?;
+        let playing = cluster
+            .player_state
+            .is_some_and(|state| state.is_playing && !state.is_paused);
         let session = self.session.clone();
         run(async move {
-            let body = serde_json::json!({ "transfer_options": { "restore_paused": "restore" } });
+            let paused = if playing { "resume" } else { "pause" };
+            let body = serde_json::json!({ "transfer_options": { "restore_paused": paused } });
             session
                 .spclient()
                 .request_as_json(

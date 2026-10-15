@@ -3,7 +3,7 @@ use crate::{
     config,
     cover::{self, Slot},
     icons,
-    spotify::{Album, Command, Error as SpotifyError, Mode, Repeat, Speaker, Track},
+    spotify::{Album, Command, Error as SpotifyError, Mode, Play, Repeat, Speaker, Track},
 };
 use hypercmd::{Error, Event, EventPayload};
 use librespot_playback::player::{PlayerEvent, PlayerEventChannel};
@@ -393,19 +393,58 @@ impl Jukebox {
         });
     }
 
-    pub(super) fn toggle_play(&self) -> Result<(), Error> {
-        let (started, playing) = self
+    pub(super) fn toggle_play(self: &Rc<Self>) -> Result<(), Error> {
+        let (uri, stopped, playing) = self
             .now
-            .with_untracked(|now| (now.uri.is_some() && !now.stopped, now.playing));
-        if !started {
-            return self.play_selected();
+            .with_untracked(|now| (now.listed_uri(), now.stopped, now.playing));
+        match uri {
+            // Nothing played yet: the selected row starts.
+            None => return self.play_selected(),
+            Some(uri) if stopped => self.play_again(uri),
+            Some(_) if playing => self.command(Command::Pause),
+            Some(_) => self.command(Command::Resume),
         }
-        self.command(if playing {
-            Command::Pause
-        } else {
-            Command::Resume
-        });
         Ok(())
+    }
+
+    /// Plays `track` again in the list it played from, which librespot needs once
+    /// stopped: it ignores a resume then. That list is the one played last from
+    /// here, or the one Spotify names, as after a transfer to this computer.
+    fn play_again(self: &Rc<Self>, track: String) {
+        let again = self.last_play.borrow().clone().map(|play| match play {
+            Play::Context { uri, .. } => Play::Context {
+                uri,
+                track: track.clone(),
+            },
+            Play::Tracks { uris, .. } => Play::Tracks {
+                uris,
+                track: track.clone(),
+            },
+        });
+        if let Some(play) = again {
+            let mode = self.mode();
+            self.with_speaker(|speaker| speaker.play(play, mode, 0));
+            return;
+        }
+        let Some(catalog) = self.catalog() else {
+            return;
+        };
+        let jukebox = self.clone();
+        let started = self.spawn(async move {
+            let play = match catalog.playing_context().await? {
+                Some(uri) => Play::Context { uri, track },
+                None => Play::Tracks {
+                    uris: vec![track.clone()],
+                    track,
+                },
+            };
+            let mode = jukebox.mode();
+            jukebox.with_speaker(|speaker| speaker.play(play, mode, 0));
+            Ok(())
+        });
+        if let Err(error) = started {
+            self.warn(error.to_string());
+        }
     }
 
     pub(super) fn seek_forward(&self) {

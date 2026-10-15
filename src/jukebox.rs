@@ -143,6 +143,8 @@ pub(crate) struct Jukebox {
     load_all: Cell<bool>,
     /// The tracks queued here that have not played yet, in order.
     queue: RefCell<Vec<String>>,
+    /// What was played last from this computer, to play again after a stop.
+    last_play: RefCell<Option<spotify::Play>>,
     /// The list the playing track was started from, for what comes next.
     playing_list: RefCell<Vec<String>>,
     /// The last track of that list to play, which the list goes on from.
@@ -228,6 +230,7 @@ impl FromInputs for Jukebox {
             full: RefCell::new(None),
             load_all: Cell::new(false),
             queue: RefCell::new(Vec::new()),
+            last_play: RefCell::new(None),
             playing_list: RefCell::new(Vec::new()),
             list_position: RefCell::new(None),
             picker: signal(None),

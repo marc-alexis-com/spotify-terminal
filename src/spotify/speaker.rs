@@ -45,6 +45,7 @@ pub(crate) struct Connection {
 }
 
 /// What to start playing: a track within a context, or within a list of tracks.
+#[derive(Clone, Debug)]
 pub(crate) enum Play {
     Context { uri: String, track: String },
     Tracks { uris: Vec<String>, track: String },
