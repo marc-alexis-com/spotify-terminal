@@ -1,4 +1,4 @@
-use super::{Catalog, Error, Repeat, fade::Fader};
+use super::{Catalog, Error, Repeat, fade::Fader, output::Output};
 use crate::config::{Autoplay, NormalisationType};
 use http::{HeaderMap, HeaderValue, Method, header::CONTENT_TYPE};
 use librespot_connect::{
@@ -9,8 +9,8 @@ use librespot_core::{
     Session, SessionConfig, authentication::Credentials, cache::Cache, config::DeviceType,
 };
 use librespot_playback::{
-    audio_backend,
-    config::{AudioFormat, Bitrate, PlayerConfig},
+    audio_backend::Sink,
+    config::{Bitrate, PlayerConfig},
     mixer::{self, MixerConfig},
     player::{Player, PlayerEvent, PlayerEventChannel},
 };
@@ -138,7 +138,6 @@ impl Drop for Speaker {
 
 async fn start(access_token: String, events: Events, volume: u16) -> Result<Connection, Error> {
     let settings = &crate::config::get().playback;
-    let backend = audio_backend::find(None).ok_or(Error::NoAudio)?;
     let mixer = mixer::find(None).ok_or(Error::NoAudio)?(MixerConfig::default())?;
     let session = Session::new(session_config(), cache()?);
     let fader = Fader::default();
@@ -147,7 +146,7 @@ async fn start(access_token: String, events: Events, volume: u16) -> Result<Conn
         player_config(),
         session.clone(),
         fader.wrap(mixer.get_soft_volume()),
-        move || backend(output, AudioFormat::default()),
+        move || Box::new(Output::new(output)) as Box<dyn Sink>,
     );
     tokio::spawn(forward(player.get_player_event_channel(), events));
     #[cfg(target_os = "linux")]

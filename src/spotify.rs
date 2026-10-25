@@ -6,6 +6,7 @@ mod fade;
 mod model;
 #[cfg(target_os = "linux")]
 mod mpris;
+mod output;
 mod search;
 mod speaker;
 mod writes;
