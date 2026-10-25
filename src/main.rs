@@ -100,6 +100,7 @@ fn run(config_path: Option<&Path>) -> Result<(), Box<dyn std::error::Error>> {
     config::install(config);
     let config = config::get();
     stop_if_stuck()?;
+    let _stderr = StderrToLog::open()?;
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()?;
@@ -122,6 +123,32 @@ fn run(config_path: Option<&Path>) -> Result<(), Box<dyn std::error::Error>> {
         cover::clear(cover::Slot::Header)?;
     }
     Ok(())
+}
+
+/// Sends stderr to a log file while the player draws, and gives it back when dropped.
+/// The audio output writes its errors there, which tore up the screen in a loop
+/// once a sound card went away under the music.
+struct StderrToLog(std::os::fd::OwnedFd);
+
+impl StderrToLog {
+    fn open() -> std::io::Result<Self> {
+        let directory = std::env::var_os("XDG_RUNTIME_DIR")
+            .map(PathBuf::from)
+            .unwrap_or_else(std::env::temp_dir);
+        let log = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(directory.join(format!("{COMMAND}.log")))?;
+        let terminal = rustix::io::dup(std::io::stderr())?;
+        rustix::stdio::dup2_stderr(&log)?;
+        Ok(Self(terminal))
+    }
+}
+
+impl Drop for StderrToLog {
+    fn drop(&mut self) {
+        let _ = rustix::stdio::dup2_stderr(&self.0);
+    }
 }
 
 /// Ends the process if it is still there a moment after a hangup, Ctrl+C or `q`.

@@ -36,7 +36,7 @@ serde_json = "=1.0.151"
 cpal = { version = "=0.16.0", default-features = false }
 http = "=1.5.0"
 image = { version = "=0.25.10", default-features = false, features = ["jpeg", "png"] }
-rustix = { version = "=1.1.4", features = ["termios"] }
+rustix = { version = "=1.1.4", features = ["stdio", "termios"] }
 librespot-protocol = "=0.8.0"
 protobuf = "=3.7.2"
 sha2 = "=0.10.9"

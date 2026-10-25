@@ -25,6 +25,8 @@
   the selected row. Music moved to another device keeps playing there: this
   computer lets it go, and joins Spotify again when something plays here.
 - **Fix.** A title too long for its column no longer runs into the next one.
+- **Fix.** Audio errors go to `$XDG_RUNTIME_DIR/spt.log` instead of the
+  screen, which they filled in a loop once a sound card went away.
 - Changes to the library go through the session, like the desktop app: the
   public Web API answers this client with "too many requests".
 
