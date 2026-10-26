@@ -84,13 +84,18 @@ impl Stream {
                 .ok_or_else(|| SinkError::ConnectionRefused("no default output".into()))?,
         };
         // Native stereo at 44.1 kHz if the card takes it, else its own rate,
-        // which rodio resamples to; as librespot's sink chooses.
+        // which rodio resamples to; as librespot's sink chooses. Keep the
+        // default's sample format: PipeWire's ALSA plugin lists U8 first, and
+        // 8-bit output hisses.
         let default = device.default_output_config().map_err(refused)?;
         let config = device
             .supported_output_configs()
             .map_err(refused)?
-            .find(|config| config.channels() == NUM_CHANNELS as cpal::ChannelCount)
-            .and_then(|config| {
+            .filter(|config| {
+                config.channels() == NUM_CHANNELS as cpal::ChannelCount
+                    && config.sample_format() == default.sample_format()
+            })
+            .find_map(|config| {
                 config
                     .try_with_sample_rate(cpal::SampleRate(SAMPLE_RATE))
                     .or_else(|| config.try_with_sample_rate(default.sample_rate()))
